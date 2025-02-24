@@ -9,7 +9,6 @@ def set_background():
     st.markdown(
         """
         <style>
-        /* Algemene achtergrondkleur */
         .stApp {
             background: linear-gradient(to bottom, #e3f2fd, #bbdefb);
         }
@@ -52,8 +51,6 @@ async def get_startlist(session, race_name):
             return []
 
         soup = BeautifulSoup(await response.text(), "html.parser")
-
-        # ✅ Selector voor startlijsten
         startlist = [rider.text.strip() for rider in soup.select("div.ridersCont ul li a, ul.riders li a")]
 
         return startlist if startlist else []
@@ -61,9 +58,9 @@ async def get_startlist(session, race_name):
 # 🎯 Haal alle startlijsten op en verzamel unieke renners
 async def fetch_data(selected_riders):
     results = []
-    rider_participation = {rider: 0 for rider in selected_riders}  # Alleen voor geselecteerde renners
+    rider_participation = {rider: 0 for rider in selected_riders}
     rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
-    weak_races = {}  # Zwakke wedstrijden en hun startlijsten
+    weak_races = {}
     all_riders_participation = {}
 
     async with aiohttp.ClientSession() as session:
@@ -73,20 +70,16 @@ async def fetch_data(selected_riders):
                 renners_count = "⚠️ Geen data"
                 team_riders = []
             else:
-                # ✅ Alleen renners uit het geselecteerde team tellen
                 team_riders = [rider for rider in selected_riders if rider in startlist]
                 renners_count = len(team_riders)
 
-                # ✅ Update deelnames per renner en schema
                 for rider in team_riders:
                     rider_participation[rider] += 1
                     rider_schedule[rider][race_name] = "✅"
 
-                # ✅ Detecteer zwakke wedstrijden
                 if renners_count <= 7:
-                    weak_races[race_name] = startlist  # Bewaar de volledige startlijst
+                    weak_races[race_name] = startlist
 
-                # ✅ Verzamel data voor alle renners
                 for rider in startlist:
                     all_riders_participation[rider] = all_riders_participation.get(rider, 0) + 1
 
@@ -97,20 +90,17 @@ async def fetch_data(selected_riders):
                 "Aantal renners": str(renners_count)
             })
 
-    # ✅ Filter aanbevolen transfers (renners die starten in zwakke wedstrijden)
     recommended_transfers = {}
     for race, race_riders in weak_races.items():
         for rider in race_riders:
             if rider not in selected_riders:
-                if rider not in recommended_transfers:
-                    recommended_transfers[rider] = 0
-                recommended_transfers[rider] += 1  # ✅ Correcte telling per wedstrijd
+                recommended_transfers[rider] = recommended_transfers.get(rider, 0) + 1
 
     return results, rider_participation, rider_schedule, recommended_transfers
 
 # 🎯 Streamlit-app
 async def main():
-    st.title("🚴 Wielermanager - Aantal renners per wedstrijd")
+    st.title("🚴 Wielermanager Tools")
 
     # ✅ Haal renners op
     with st.spinner("Bezig met laden van startlijsten..."):
@@ -127,22 +117,21 @@ async def main():
     selected_riders = st.multiselect("Kies jouw renners:", all_riders)
 
     if selected_riders:
-        # ✅ Haal data op
         results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
 
-        # ✅ Maak dataframe en zorg voor correcte index
         df = pd.DataFrame(results)
-        df.index = df.index + 1  # ✅ Start bij 1 i.p.v. 0
+        df.index = df.index + 1
         st.dataframe(df)
 
-        # 🎯 Overzicht van welke renners waar starten (schema)
+        # 🎯 Overzicht per renner en wedstrijd
         st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
         schedule_df = pd.DataFrame.from_dict(rider_schedule, orient="index")
-        st.dataframe(schedule_df.sort_index())  # ✅ Sorteer alfabetisch op renner
+        st.dataframe(schedule_df.sort_index())
 
-        # 🎯 Keuzemenu om per wedstrijd de renners uit jouw team te tonen
-        st.subheader("🏁 Jouw renners per wedstrijd")
+        # 🎯 Jouw renners per wedstrijd
+        st.subheader("🏁 Jouw startlijst per wedstrijd")
         wedstrijd_optie = st.selectbox("Selecteer een wedstrijd om jouw renners te zien:", [r["Wedstrijd"] for r in results])
+
         if wedstrijd_optie:
             async with aiohttp.ClientSession() as session:
                 startlist = await get_startlist(session, wedstrijd_optie)
@@ -150,30 +139,20 @@ async def main():
 
             st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
             if team_riders:
-                st.success(" ".join([f"✅ **{rider}**" for rider in team_riders]))
+                for rider in team_riders:
+                    st.success(f"✅ **{rider}**")
             else:
                 st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
 
-        # 🎯 Lijst met aanbevolen transfers
-        st.subheader("🔄 Aangeraden transfers voor zwakke wedstrijden")
-        if recommended_transfers:
-            transfer_df = pd.DataFrame(
-                sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
-                columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers van mijn team"]
-            )
-            st.dataframe(transfer_df.set_index("Renner"))  # ✅ Verwijder index voor nettere weergave
-        else:
-            st.info("✅ Geen aanbevolen transfers nodig. Je team heeft voldoende dekking!")
+        # 🎯 Aangeraden transfers
+        st.subheader("🔄 Aangeraden transfers voor zwak bezette wedstrijden")
+        transfer_df = pd.DataFrame(sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True), columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers van mijn team"])
+        st.dataframe(transfer_df.set_index("Renner"))
 
-        # 🎯 Lijst met aantal deelnames per renner
+        # 🎯 Aantal deelnames per renner
         st.subheader("📊 Deelnames per renner")
-        rider_df = pd.DataFrame(
-            sorted(rider_participation.items(), key=lambda x: x[1], reverse=True), 
-            columns=["Renner", "Aantal deelnames"]
-        )
-        st.dataframe(rider_df.set_index("Renner"))  # ✅ Verwijder index voor nettere weergave
-    else:
-        st.warning("🚨 Selecteer eerst renners om door te gaan!")
+        rider_df = pd.DataFrame(sorted(rider_participation.items(), key=lambda x: x[1], reverse=True), columns=["Renner", "Aantal deelnames"])
+        st.dataframe(rider_df.set_index("Renner"))
 
 # 🎯 Start de Streamlit-app
 if __name__ == "__main__":
