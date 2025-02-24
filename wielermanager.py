@@ -116,7 +116,7 @@ async def main():
     st.title("🚴 Wielermanager Tools")
 
     # ✅ Haal renners op
-    with st.spinner("Bezig met halen van startlijsten van procyclingstats.com..."):
+    with st.spinner("Bezig met ophalen van startlijsten van procyclingstats.com..."):
         async with aiohttp.ClientSession() as session:
             all_riders = set()
             for race_name, _, _ in races:
