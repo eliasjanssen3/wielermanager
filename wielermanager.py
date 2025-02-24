@@ -115,6 +115,9 @@ async def get_rider_schedule(selected_riders):
 async def main():
     st.title("🚴 Wielermanager Tools")
 
+    if "selected_riders" not in st.session_state:
+        st.session_state.selected_riders = []
+
     # ✅ Haal renners op
     with st.spinner("Bezig met ophalen van startlijsten van procyclingstats.com..."):
         async with aiohttp.ClientSession() as session:
@@ -127,7 +130,11 @@ async def main():
 
     # ✅ Selecteer renners
     st.subheader("📋 Selecteer je team")
-    selected_riders = st.multiselect("Kies jouw renners:", all_riders)
+    selected_riders = st.multiselect(
+    "Kies jouw renners:", all_riders, default=st.session_state.selected_riders)
+
+    # Sla keuzes op in session state
+    st.session_state.selected_riders = selected_riders
 
     if selected_riders:
         results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
