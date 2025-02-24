@@ -62,6 +62,7 @@ async def get_startlist(session, race_name):
 async def fetch_data(selected_riders):
     results = []
     rider_participation = {rider: 0 for rider in selected_riders}  # Alleen voor geselecteerde renners
+    rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
 
     async with aiohttp.ClientSession() as session:
         for race_name, race_date, category in races:
@@ -74,9 +75,10 @@ async def fetch_data(selected_riders):
                 team_riders = [rider for rider in selected_riders if rider in startlist]
                 renners_count = len(team_riders)
 
-                # ✅ Update deelnames per renner
+                # ✅ Update deelnames per renner en schema
                 for rider in team_riders:
                     rider_participation[rider] += 1
+                    rider_schedule[rider][race_name] = "✅"
 
             results.append({
                 "Wedstrijd": race_name,
@@ -85,7 +87,7 @@ async def fetch_data(selected_riders):
                 "Aantal renners": str(renners_count)
             })
 
-    return results, rider_participation
+    return results, rider_participation, rider_schedule
 
 # 🎯 Streamlit-app
 async def main():
@@ -107,7 +109,7 @@ async def main():
 
     if selected_riders:
         # ✅ Haal data op
-        results, rider_participation = await fetch_data(selected_riders)
+        results, rider_participation, rider_schedule = await fetch_data(selected_riders)
 
         # ✅ Maak dataframe en zorg voor correcte index
         df = pd.DataFrame(results)
@@ -131,6 +133,11 @@ async def main():
                 st.success("\n".join([f"✅ **{rider}**" for rider in team_riders]))  # Onder elkaar
             else:
                 st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
+
+        # 🎯 Overzicht van welke renners waar starten (schema)
+        st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
+        schedule_df = pd.DataFrame.from_dict(rider_schedule, orient="index")
+        st.dataframe(schedule_df)
 
         # 🎯 Lijst met aantal deelnames per renner
         st.subheader("📊 Deelnames per renner")
