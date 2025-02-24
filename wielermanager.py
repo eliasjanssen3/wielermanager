@@ -98,6 +98,19 @@ async def fetch_data(selected_riders):
 
     return results, rider_participation, rider_schedule, recommended_transfers
 
+async def get_rider_schedule(selected_riders):
+    """Haalt het wedstrijdschema op voor ingevoerde renners."""
+    rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
+
+    async with aiohttp.ClientSession() as session:
+        for race_name, _, _ in races:
+            startlist = await get_startlist(session, race_name)
+            for rider in selected_riders:
+                if rider in startlist:
+                    rider_schedule[rider][race_name] = "✅"
+
+    return rider_schedule
+
 # 🎯 Streamlit-app
 async def main():
     st.title("🚴 Wielermanager Tools")
@@ -128,6 +141,28 @@ async def main():
         schedule_df = pd.DataFrame.from_dict(rider_schedule, orient="index")
         st.dataframe(schedule_df.sort_index())
 
+        # 🎯 Vergelijk mogelijke transfers
+        st.subheader("🔍 Vergelijk mogelijke transfers")
+        transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", all_riders)
+
+        # Zorg ervoor dat transfer_rider_schedule altijd geïnitialiseerd is
+        transfer_rider_schedule = {}
+
+        if transfer_riders:
+            with st.spinner("Bezig met ophalen van schema's..."):
+                transfer_rider_schedule = await get_rider_schedule(transfer_riders)
+
+        # ✅ Toon schema in tabel alleen als er renners zijn ingevoerd
+        if transfer_rider_schedule:
+            st.subheader("📅 Wedstrijdschema van mogelijke transfers")
+            transfer_schedule_df = pd.DataFrame.from_dict(transfer_rider_schedule, orient="index").sort_index()
+            st.dataframe(transfer_schedule_df)
+
+        # 🎯 Aangeraden transfers
+        st.subheader("🔄 Voorgestelde transfers voor zwak bezette wedstrijden")
+        transfer_df = pd.DataFrame(sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True), columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers van mijn team"])
+        st.dataframe(transfer_df.set_index("Renner"))
+
         # 🎯 Jouw renners per wedstrijd
         st.subheader("🏁 Jouw startlijst per wedstrijd")
         wedstrijd_optie = st.selectbox("Selecteer een wedstrijd om jouw renners te zien:", [r["Wedstrijd"] for r in results])
@@ -143,11 +178,6 @@ async def main():
                     st.success(f"✅ **{rider}**")
             else:
                 st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
-
-        # 🎯 Aangeraden transfers
-        st.subheader("🔄 Aangeraden transfers voor zwak bezette wedstrijden")
-        transfer_df = pd.DataFrame(sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True), columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers van mijn team"])
-        st.dataframe(transfer_df.set_index("Renner"))
 
         # 🎯 Aantal deelnames per renner
         st.subheader("📊 Deelnames per renner")
