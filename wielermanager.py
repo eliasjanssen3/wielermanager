@@ -186,4 +186,6 @@ async def main():
 
 # 🎯 Start de Streamlit-app
 if __name__ == "__main__":
+    import nest_asyncio
+    nest_asyncio.apply()
     asyncio.run(main())
