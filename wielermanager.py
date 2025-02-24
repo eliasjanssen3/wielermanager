@@ -174,7 +174,7 @@ async def main():
 
             st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
             if team_riders:
-                for rider in team_riders:
+                for rider in sorted(team_riders):  # ✅ Sorteer alfabetisch
                     st.success(f"✅ **{rider}**")
             else:
                 st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
