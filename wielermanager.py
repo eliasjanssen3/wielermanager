@@ -137,7 +137,7 @@ async def main():
         # 🎯 Overzicht van welke renners waar starten (schema)
         st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
         schedule_df = pd.DataFrame.from_dict(rider_schedule, orient="index")
-        st.dataframe(schedule_df)
+        st.dataframe(schedule_df.sort_index())  # ✅ Sorteer alfabetisch op renner
 
         # 🎯 Lijst met aantal deelnames per renner
         st.subheader("📊 Deelnames per renner")
