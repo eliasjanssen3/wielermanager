@@ -132,7 +132,16 @@ async def main():
     if selected_riders:
         results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
 
+        # Zet datum om naar een gestructureerd datetime-object voor correcte sortering
         df = pd.DataFrame(results)
+        df["Datum"] = pd.to_datetime(df["Datum"], format="%d %B")  # "%d %B" = "8 maart"
+
+        # Sorteer de dataframe op datum
+        df = df.sort_values(by="Datum")
+
+        # Zet datum terug naar leesbaar formaat
+        df["Datum"] = df["Datum"].dt.strftime("%-d %B")  # "-d" voorkomt een voorloopnul
+
         df.index = df.index + 1
         st.dataframe(df)
 
