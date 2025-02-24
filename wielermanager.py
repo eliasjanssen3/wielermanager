@@ -132,25 +132,7 @@ async def main():
     if selected_riders:
         results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
 
-        # Maak een mapping van Nederlandse maanden naar Engelse
-        maand_mapping = {
-            "januari": "January", "februari": "February", "maart": "March", "april": "April",
-            "mei": "May", "juni": "June", "juli": "July", "augustus": "August",
-            "september": "September", "oktober": "October", "november": "November", "december": "December"
-        }
-
-        # Zet de Nederlandse maandnamen om naar Engels
-        df["Datum"] = df["Datum"].replace(maand_mapping, regex=True)
-
-        # Converteer naar datetime
-        df["Datum"] = pd.to_datetime(df["Datum"], format="%d %B")
-
-        # Sorteer de dataframe op datum
-        df = df.sort_values(by="Datum")
-
-        # Zet datum terug naar Nederlands
-        df["Datum"] = df["Datum"].dt.strftime("%-d %B")  # "-d" voorkomt een voorloopnul
-
+        df = pd.DataFrame(results)
         df.index = df.index + 1
         st.dataframe(df)
 
