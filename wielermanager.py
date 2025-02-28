@@ -5,9 +5,18 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import unicodedata
 import re
+import os
 
 # Inlezen van het Excel-bestand met prijzen
-file_path = "/Users/eliasjanssen/Documents/wielermanager/PrijzenWielermanager.xlsx"  # Pas dit aan naar de juiste locatie
+# Zoek het pad naar het bestand in de repository
+file_path = os.path.join(os.path.dirname(__file__), "data/PrijzenWielermanager.xlsx")
+
+# Controleer of het bestand bestaat en laad het in
+if os.path.exists(file_path):
+    df_prices = pd.read_excel(file_path, sheet_name='Blad1')
+    st.write("✅ Prijzenbestand geladen!")  # Debug check
+else:
+    st.error("❌ Prijzenbestand niet gevonden! Zorg ervoor dat het in de repository staat.")
 xls = pd.ExcelFile(file_path)
 df_prices = pd.read_excel(xls, sheet_name='Blad1')
 df_prices.columns = ["Renner", "Prijs"]
