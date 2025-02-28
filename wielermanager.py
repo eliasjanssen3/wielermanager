@@ -56,6 +56,27 @@ async def get_startlist(session, race_name):
         return startlist if startlist else []
 
 # 🎯 Haal alle startlijsten op en verzamel unieke renners
+async def fetch_all_riders():
+        all_riders = set()
+        async with aiohttp.ClientSession() as session:
+            tasks = [get_startlist(session, race_name) for race_name, _, _ in races]
+            results = await asyncio.gather(*tasks)
+            for startlist in results:
+                all_riders.update(startlist)
+        return sorted(all_riders)
+
+if "all_riders" not in st.session_state:
+    st.session_state.all_riders = []  # Zorg dat de variabele bestaat
+
+    # Start asynchrone taak om renners op te halen
+    async def load_riders():
+        st.session_state.all_riders = await fetch_all_riders()
+    
+    asyncio.run(load_riders())  # Start ophalen zonder UI-blokkade
+
+async def fetch_all_riders_async():
+    st.session_state.all_riders = await fetch_all_riders()
+
 async def fetch_data(selected_riders):
     results = []
     rider_participation = {rider: 0 for rider in selected_riders}
@@ -115,28 +136,45 @@ async def get_rider_schedule(selected_riders):
 async def main():
     st.title("🚴 Wielermanager Tools")
 
+    if "all_riders" not in st.session_state:
+        st.session_state.all_riders = []  # Zorg dat het altijd bestaat
+
+    if "search_button" not in st.session_state:
+        st.session_state.search_button = False
+
     if "selected_riders" not in st.session_state:
         st.session_state.selected_riders = []
 
-    # ✅ Haal renners op
-    with st.spinner("Bezig met ophalen van startlijsten van procyclingstats.com..."):
-        async with aiohttp.ClientSession() as session:
-            all_riders = set()
-            for race_name, _, _ in races:
-                startlist = await get_startlist(session, race_name)
-                all_riders.update(startlist)
+    # ✅ Haal renners pas op bij klikken op de knop
+    all_riders = set()
 
-    all_riders = sorted(all_riders)
+    selected_riders = st.session_state.get("selected_riders", [])
+
+    if st.session_state.get("search_button", False) and selected_riders:
+        with st.spinner("Bezig met zoeken in startlijsten..."):
+            async with aiohttp.ClientSession() as session:
+                all_riders = set()
+                for race_name, _, _ in races:
+                    startlist = await get_startlist(session, race_name)
+                    all_riders.update(startlist)
+        
+            st.session_state.all_riders = sorted(all_riders)
+
+
+    all_riders = st.session_state.all_riders
 
     # ✅ Selecteer renners
     st.subheader("📋 Selecteer je team")
+    if "all_riders" not in st.session_state:
+        st.session_state.all_riders = []
+
     selected_riders = st.multiselect(
-    "Kies jouw renners:", all_riders, default=st.session_state.selected_riders)
+    "Kies jouw renners:", st.session_state.all_riders, default=st.session_state.get("selected_riders", []))
 
-    # Sla keuzes op in session state
-    st.session_state.selected_riders = selected_riders
+    if st.button("🔍 Zoeken"):
+        st.session_state.search_button = True
 
-    if selected_riders:
+    if st.session_state.search_button and selected_riders:
         results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
 
         df = pd.DataFrame(results)
@@ -150,7 +188,9 @@ async def main():
 
         # 🎯 Vergelijk mogelijke transfers
         st.subheader("🔍 Vergelijk mogelijke transfers")
-        transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", all_riders)
+        available_transfers = [rider for rider in st.session_state.all_riders if rider not in selected_riders]
+
+        transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", available_transfers)
 
         # Zorg ervoor dat transfer_rider_schedule altijd geïnitialiseerd is
         transfer_rider_schedule = {}
