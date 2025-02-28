@@ -11,17 +11,12 @@ import os
 # Zoek het pad naar het bestand in de repository
 file_path = os.path.join(os.path.dirname(__file__), "data/PrijzenWielermanager.xlsx")
 
-# Controleer of het bestand bestaat en laad het in
+# Controleer of het bestand bestaat
 if os.path.exists(file_path):
-    df_prices = pd.read_excel(file_path, sheet_name='Blad1')
-    st.write("✅ Prijzenbestand geladen!")  # Debug check
-else:
-    st.error("❌ Prijzenbestand niet gevonden! Zorg ervoor dat het in de repository staat.")
-xls = pd.ExcelFile(file_path)
-df_prices = pd.read_excel(xls, sheet_name='Blad1')
-df_prices.columns = ["Renner", "Prijs"]
-df_prices = df_prices.dropna()
-df_prices["Prijs"] = pd.to_numeric(df_prices["Prijs"], errors='coerce')
+    df_prices = pd.read_excel(file_path, sheet_name='Blad1')  # Gebruik file_path, niet xlsx
+    df_prices.columns = ["Renner", "Prijs"]
+    df_prices = df_prices.dropna()
+    df_prices["Prijs"] = pd.to_numeric(df_prices["Prijs"], errors='coerce')
 
 def normalize_name(name):
     """Vervang speciale tekens en verwijder accenten en niet-ASCII tekens."""
