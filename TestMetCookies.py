@@ -2,61 +2,86 @@ import streamlit as st
 import aiohttp
 import asyncio
 import pandas as pd
+import pyodbc
+import uuid
 from bs4 import BeautifulSoup
-import unicodedata
-import re
+import os
+from streamlit_cookies_manager import EncryptedCookieManager
 
-# Inlezen van het Excel-bestand met prijzen
-file_path = "/Users/eliasjanssen/Documents/wielermanager/PrijzenWielermanager.xlsx"  # Pas dit aan naar de juiste locatie
-xls = pd.ExcelFile(file_path)
-df_prices = pd.read_excel(xls, sheet_name='Blad1')
-df_prices.columns = ["Renner", "Prijs"]
-df_prices = df_prices.dropna()
-df_prices["Prijs"] = pd.to_numeric(df_prices["Prijs"], errors='coerce')
+# ✅ Database Verbinden (Pas deze waarden aan als nodig)
+DB_CONNECTION_STRING = "DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost,1433;DATABASE=WielermanagerUsers;UID=sa;PWD=BournemouthJa1!"
 
-def normalize_name(name):
-    """Vervang speciale tekens en verwijder accenten en niet-ASCII tekens."""
-    replacements = {
-        "Æ": "AE", "æ": "ae",
-        "Ø": "O", "ø": "o",
-        "Å": "A", "å": "a",
-        "Č": "C", "č": "c",
-        "Š": "S", "š": "s",
-        "Đ": "D", "đ": "d",
-        "Ž": "Z", "ž": "z",
-        "Ć": "C", "ć": "c"
-    }
-    
-    # Vervang specifieke tekens
-    for special, replacement in replacements.items():
-        name = name.replace(special, replacement)
+# 🔑 Cookies instellen om unieke gebruikers te herkennen
+PASSWORD = os.getenv("COOKIE_SECRET", "geheime_sleutel_123")
+cookies = EncryptedCookieManager(prefix="wielermanager_", password=PASSWORD)
 
-    # Verwijder overige accenten
-    name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8')
+# ✅ Zorg dat cookies correct worden ingesteld en opgeslagen bij eerste bezoek
+if not cookies.ready():
+    st.stop()  # Wacht tot cookies klaar zijn
 
-    # Verwijder overige niet-ASCII tekens (mocht er iets achterblijven)
-    name = re.sub(r'[^a-zA-Z\s-]', '', name)
+# 🎯 Unieke gebruiker identificeren
+user_id = cookies.get("user_id")
 
-    return name.strip().lower()
+# ✅ Als de gebruiker nog geen ID heeft, genereer een nieuwe en sla op
+if not user_id:
+    user_id = str(uuid.uuid4())  # Maak een unieke ID aan
+    cookies["user_id"] = user_id
+    cookies.save()  # BELANGRIJK: Dit zorgt ervoor dat de cookie wordt opgeslagen
+else:
+    user_id = cookies.get("user_id")  # Haal bestaande ID op
 
-def get_rider_price(rider_name):
-    """Zoekt de prijs van een renner in de Excel-lijst zonder accenten."""
-    normalized_rider_name = normalize_name(rider_name)
+# ✅ Functie: Haal opgeslagen keuzes op uit de database
+def get_user_selection(user_id):
+    conn = pyodbc.connect(DB_CONNECTION_STRING)
+    cursor = conn.cursor()
+    cursor.execute("SELECT selected_riders FROM UserSelections WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0].split(",")  # Teruggeven als lijst van renners
+    return []
 
-    # Normaliseer de Excel-namen
-    df_prices["Normalized"] = df_prices["Renner"].apply(normalize_name)
+# ✅ Functie: Sla geselecteerde renners op in de database
+def save_user_selection(user_id, selected_riders):
+    conn = pyodbc.connect(DB_CONNECTION_STRING)
+    cursor = conn.cursor()
+    selected_riders_str = ",".join(selected_riders)  # Zet lijst om in string
+    cursor.execute("""
+    MERGE INTO UserSelections AS target
+    USING (SELECT ? AS user_id) AS source
+    ON target.user_id = source.user_id
+    WHEN MATCHED THEN
+        UPDATE SET selected_riders = ?, last_updated = GETDATE()
+    WHEN NOT MATCHED THEN
+        INSERT (user_id, selected_riders, last_updated) VALUES (?, ?, GETDATE());
+""", (user_id, selected_riders_str, user_id, selected_riders_str))
+    conn.commit()
+    conn.close()
 
-    # Zoek op exacte match
-    price_row = df_prices[df_prices["Normalized"] == normalized_rider_name]
+# ✅ Haal eerder geselecteerde renners op
+stored_selected_riders = get_user_selection(user_id)
 
-    # Als er geen exacte match is, zoek naar een gedeeltelijke match
-    if price_row.empty:
-        for excel_name in df_prices["Normalized"]:
-            if normalized_rider_name in excel_name or excel_name in normalized_rider_name:
-                price_row = df_prices[df_prices["Normalized"] == excel_name]
-                break
+# 🎯 Streamlit UI
+st.title("🚴 Wielermanager Tools")
 
-    return f" ({int(price_row.iloc[0]['Prijs'])}M)" if not price_row.empty else ""
+# ✅ Selecteer renners
+all_riders = ["Van Aert", "Pogacar", "Vingegaard", "Evenepoel", "Roglic", "Alaphilippe"]  # Voeg alle mogelijke renners toe
+selected_riders = st.multiselect("Kies jouw renners:", all_riders, default=stored_selected_riders)
+
+# ✅ Knop om keuzes op te slaan
+if st.button("💾 Opslaan"):
+    save_user_selection(user_id, selected_riders)
+    st.success("Je selectie is opgeslagen! ✅")
+
+# ✅ Toon geselecteerde renners
+st.write("Jouw opgeslagen renners:", selected_riders)
+
+# ✅ Vergelijk mogelijke transfers (Exclusief eigen team)
+st.subheader("🔍 Vergelijk mogelijke transfers")
+available_transfers = [rider for rider in all_riders if rider not in selected_riders]
+transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", available_transfers)
+
+st.write("Geselecteerde transfers:", transfer_riders)
 
 # 🎨 Achtergrond instellen
 def set_background():
@@ -127,41 +152,6 @@ if "all_riders" not in st.session_state:
         st.session_state.all_riders = await fetch_all_riders()
     
     asyncio.run(load_riders())  # Start ophalen zonder UI-blokkade
-
-# Aanpassing in fetch_data om prijzen toe te voegen
-def add_prices_to_recommended_transfers(recommended_transfers):
-    df_transfers = pd.DataFrame(
-        sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
-    )
-    df_transfers["Prijs"] = df_transfers["Renner"].apply(get_rider_price)
-    df_transfers["Renner"] = df_transfers["Renner"] + df_transfers["Prijs"]
-    df_transfers.drop(columns=["Prijs"], inplace=True)
-    return df_transfers
-
-def add_prices_to_rider_participation(rider_participation):
-    df_rider_participation = pd.DataFrame(
-        sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal deelnames"]
-    )
-    df_rider_participation["Prijs"] = df_rider_participation["Renner"].apply(get_rider_price)
-    df_rider_participation["Renner"] = df_rider_participation["Renner"] + df_rider_participation["Prijs"]
-    df_rider_participation.drop(columns=["Prijs"], inplace=True)
-    return df_rider_participation
-
-def add_prices_to_rider_schedule(rider_schedule):
-    updated_schedule = {}
-    for rider, races in rider_schedule.items():
-        rider_with_price = rider + get_rider_price(rider)
-        updated_schedule[rider_with_price] = races
-    return updated_schedule
-
-def add_prices_to_transfer_schedule(transfer_rider_schedule):
-    updated_schedule = {}
-    for rider, races in transfer_rider_schedule.items():
-        rider_with_price = rider + get_rider_price(rider)
-        updated_schedule[rider_with_price] = races
-    return updated_schedule
 
 async def fetch_all_riders_async():
     st.session_state.all_riders = await fetch_all_riders()
@@ -272,8 +262,7 @@ async def main():
 
         # 🎯 Overzicht per renner en wedstrijd
         st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
-        rider_schedule_with_prices = add_prices_to_rider_schedule(rider_schedule)
-        schedule_df = pd.DataFrame.from_dict(rider_schedule_with_prices, orient="index")
+        schedule_df = pd.DataFrame.from_dict(rider_schedule, orient="index")
         st.dataframe(schedule_df.sort_index())
 
         # 🎯 Vergelijk mogelijke transfers
@@ -292,14 +281,13 @@ async def main():
         # ✅ Toon schema in tabel alleen als er renners zijn ingevoerd
         if transfer_rider_schedule:
             st.subheader("📅 Wedstrijdschema van mogelijke transfers")
-            transfer_schedule_with_prices = add_prices_to_transfer_schedule(transfer_rider_schedule)
-            transfer_schedule_df = pd.DataFrame.from_dict(transfer_schedule_with_prices, orient="index").sort_index()
+            transfer_schedule_df = pd.DataFrame.from_dict(transfer_rider_schedule, orient="index").sort_index()
             st.dataframe(transfer_schedule_df)
 
         # 🎯 Aangeraden transfers
-        df_transfers = add_prices_to_recommended_transfers(recommended_transfers)
         st.subheader("🔄 Voorgestelde transfers voor zwak bezette wedstrijden")
-        st.dataframe(df_transfers.set_index("Renner"))
+        transfer_df = pd.DataFrame(sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True), columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers van mijn team"])
+        st.dataframe(transfer_df.set_index("Renner"))
 
         # 🎯 Jouw renners per wedstrijd
         st.subheader("🏁 Jouw startlijst per wedstrijd")
@@ -319,8 +307,8 @@ async def main():
 
         # 🎯 Aantal deelnames per renner
         st.subheader("📊 Deelnames per renner")
-        df_rider_participation = add_prices_to_rider_participation(rider_participation)
-        st.dataframe(df_rider_participation.set_index("Renner"))
+        rider_df = pd.DataFrame(sorted(rider_participation.items(), key=lambda x: x[1], reverse=True), columns=["Renner", "Aantal deelnames"])
+        st.dataframe(rider_df.set_index("Renner"))
 
 # 🎯 Start de Streamlit-app
 if __name__ == "__main__":
