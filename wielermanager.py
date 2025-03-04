@@ -8,6 +8,7 @@ import re
 import os
 from rapidfuzz import process
 from datetime import datetime
+from datetime import timedelta
 
 # Inlezen van het Excel-bestand met prijzen
 # Zoek het pad naar het bestand in de repository
@@ -266,6 +267,15 @@ def get_next_race(races):
 
     return races[-1][0]  # Als er geen toekomstige races zijn, geef de laatste terug
 
+# ⏳ Countdown naar de eerstvolgende koers
+def countdown_to_next_race():
+    now = datetime.now()
+    for race_name, race_datetime, _ in races:
+        race_time = datetime.strptime(race_datetime, "%Y-%m-%d %H:%M")
+        if race_time > now:
+            countdown = race_time - now
+            return race_name, countdown
+    return None, None
 
 # 🎯 Streamlit-app
 async def main():
@@ -404,6 +414,12 @@ async def main():
         st.subheader("📊 Deelnames per renner")
         df_rider_participation = add_prices_to_rider_participation(rider_participation)
         st.dataframe(df_rider_participation.set_index("Renner"))
+
+        # ⏳ Countdown naar de eerstvolgende koers onderaan de pagina
+        st.markdown("---")  # Voegt een scheidingslijn toe voor duidelijkheid
+        next_race, time_left = countdown_to_next_race()
+        if next_race:
+            st.subheader(f"⏳ Nog **{time_left.days} dagen en {time_left.seconds // 3600} uur** tot **{next_race}**!")
 
 # 🎯 Start de Streamlit-app
 if __name__ == "__main__":
