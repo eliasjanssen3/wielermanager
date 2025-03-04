@@ -322,6 +322,9 @@ async def main():
             else:
                 st.warning("Geen renners gevonden. Controleer de spelling of probeer andere varianten.")
 
+            # ❗ Voeg de waarschuwing toe als er minder dan 20 renners zijn toegevoegd
+            if len(matched_riders) != 20:
+                st.warning("⚠️ Let op! Je hebt geen 20 renners geselecteerd.")
 
     # ✅ Selecteer renners
     st.subheader("📋 Selecteer je team")
@@ -337,7 +340,7 @@ async def main():
 
     if st.session_state.search_button and selected_riders:
         results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
-
+    
         df = pd.DataFrame(results)
         df.index = df.index + 1
         st.dataframe(df.drop(columns=["Datum"]))
