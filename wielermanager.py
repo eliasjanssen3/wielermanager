@@ -7,6 +7,7 @@ import unicodedata
 import re
 import os
 from fuzzywuzzy import process
+from datetime import datetime
 
 # Inlezen van het Excel-bestand met prijzen
 # Zoek het pad naar het bestand in de repository
@@ -102,25 +103,25 @@ set_background()
 
 # 🎯 Lijst met correcte namen en categorieën
 races = [
-    ("Omloop Het Nieuwsblad", "1 maart", "World Tour"),
-    ("Kuurne-Brussel-Kuurne", "2 maart", "Niet-World Tour"),
-    ("GP-Samyn", "4 maart", "Niet-World Tour"),
-    ("Strade Bianche", "8 maart", "World Tour"),
-    ("Nokere Koers", "19 maart", "Niet-World Tour"),
-    ("Bredene Koksijde Classic", "21 maart", "Niet-World Tour"),
-    ("Milano-Sanremo", "22 maart", "Monument"),
-    ("Classic Brugge-De Panne", "26 maart", "World Tour"),
-    ("E3 Harelbeke", "28 maart", "World Tour"),
-    ("Gent-Wevelgem", "30 maart", "World Tour"),
-    ("Dwars door Vlaanderen", "2 april", "World Tour"),
-    ("Ronde van Vlaanderen", "6 april", "Monument"),
-    ("Scheldeprijs", "9 april", "Niet-World Tour"),
-    ("Paris-Roubaix", "13 april", "Monument"),
-    ("Ronde van Limburg", "16 april", "Niet-World Tour"),
-    ("Brabantse Pijl", "18 april", "Niet-World Tour"),
-    ("Amstel Gold Race", "20 april", "World Tour"),
-    ("La Fleche Wallone", "23 april", "World Tour"),
-    ("Liège-Bastogne-Liège", "27 april", "Monument"),
+    ("Omloop Het Nieuwsblad", "2025-03-01 11:30", "World Tour"),
+    ("Kuurne-Brussel-Kuurne", "2025-03-02 12:14", "Niet-World Tour"),
+    ("Ename Samyn Classic", "2025-03-04 12:35", "Niet-World Tour"),
+    ("Strade Bianche", "2025-03-08 11:25", "World Tour"),
+    ("Danilith Nokere Koerse", "2025-03-19 12:55", "Niet-World Tour"),
+    ("Bredene Koksijde Classic", "2025-03-21 12:22", "Niet-World Tour"),
+    ("Milaan-Sanremo", "2025-03-22 13:00", "Monument"),
+    ("Classic Brugge-De Panne", "2025-03-26 12:50", "World Tour"),
+    ("E3 Saxo Classic", "2025-03-28 12:52", "World Tour"),
+    ("Gent-Wevelgem in Flanders Fields", "2025-03-30 10:50", "World Tour"),
+    ("Dwars door Vlaanderen", "2025-04-02 12:40", "World Tour"),
+    ("Ronde van Vlaanderen", "2025-04-06 10:17", "Monument"),
+    ("Scheldeprijs", "2025-04-09 13:09", "Niet-World Tour"),
+    ("Paris-Roubaix", "2025-04-13 14:00", "Monument"),
+    ("Ronde van Limburg", "2025-04-16 13:15", "Niet-World Tour"),
+    ("Brabantse Pijl", "2025-04-18 13:12", "Niet-World Tour"),
+    ("Amstel Gold Race", "2025-04-20 10:43", "World Tour"),
+    ("Waalse Pijl", "2025-04-23 14:00", "World Tour"),
+    ("Luik-Bastenaken-Luik", "2025-04-27 14:00", "Monument")
 ]
 
 # 🎯 Scrape startlijst van ProCyclingStats
@@ -248,6 +249,18 @@ async def get_rider_schedule(selected_riders):
 
     return rider_schedule
 
+def get_next_race(races):
+    """Bepaal de eerstvolgende race op basis van de huidige datum en tijd, zonder de datum te tonen."""
+    now = datetime.now()
+
+    for race_name, race_datetime, _ in races:
+        race_time = datetime.strptime(race_datetime, "%Y-%m-%d %H:%M")
+        if race_time > now:
+            return race_name  # Geef de eerstvolgende wedstrijd terug
+
+    return races[-1][0]  # Als er geen toekomstige races zijn, geef de laatste terug
+
+
 # 🎯 Streamlit-app
 async def main():
     st.title("🚴 Wielermanager Tools")
@@ -355,8 +368,15 @@ async def main():
         st.dataframe(df_transfers.set_index("Renner"))
 
         # 🎯 Jouw renners per wedstrijd
+        # Bepaal eerstvolgende wedstrijd (zonder datum te tonen)
+        next_race = get_next_race(races)
+
         st.subheader("🏁 Jouw startlijst per wedstrijd")
-        wedstrijd_optie = st.selectbox("Selecteer een wedstrijd om jouw renners te zien:", [r["Wedstrijd"] for r in results])
+        wedstrijd_optie = st.selectbox(
+            "Selecteer een wedstrijd om jouw renners te zien:", 
+            [race[0] for race in races], 
+            index=[race[0] for race in races].index(next_race)  # Automatisch de eerstvolgende kiezen
+        )
 
         if wedstrijd_optie:
             async with aiohttp.ClientSession() as session:
