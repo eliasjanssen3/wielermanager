@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import unicodedata
 import re
 import os
-from fuzzywuzzy import process
+from rapidfuzz import process
 from datetime import datetime
 
 # Inlezen van het Excel-bestand met prijzen
