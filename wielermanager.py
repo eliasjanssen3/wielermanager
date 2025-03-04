@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import unicodedata
 import re
 import os
+from fuzzywuzzy import process
 
 # Inlezen van het Excel-bestand met prijzen
 # Zoek het pad naar het bestand in de repository
@@ -42,6 +43,28 @@ def normalize_name(name):
     name = re.sub(r'[^a-zA-Z\s-]', '', name)
 
     return name.strip().lower()
+
+def find_best_match(input_name, all_riders):
+    """Zoekt de beste match voor een renner in de lijst met fuzzy matching."""
+    if not all_riders:
+        return None
+
+    # Normaliseer alle rennersnamen
+    normalized_riders = {rider: normalize_name(rider) for rider in all_riders}
+
+    # Normaliseer de invoernaam
+    normalized_input = normalize_name(input_name)
+
+    # Zoek de beste match op basis van fuzzy matching
+    best_match, score = process.extractOne(normalized_input, normalized_riders.values())
+
+    # Als de match goed genoeg is (bijv. minstens 80% overeenkomst), retourneer de originele naam
+    if score > 80:
+        for original, norm in normalized_riders.items():
+            if norm == best_match:
+                return original
+
+    return None  # Geen goede match gevonden
 
 def get_rider_price(rider_name):
     """Zoekt de prijs van een renner in de Excel-lijst zonder accenten."""
@@ -256,13 +279,39 @@ async def main():
 
     all_riders = st.session_state.all_riders
 
+    st.subheader("📋 Snel jouw team invoeren")
+    
+    rider_input = st.text_area(
+        "Plak of typ rennersnamen, gescheiden door komma’s of nieuwe regels:")
+
+    if st.button("✅ Voeg toe"):
+        if rider_input:
+            # Split invoer op komma's of nieuwe regels
+            input_riders = re.split(r',|\n', rider_input)
+            input_riders = [rider.strip() for rider in input_riders if rider.strip()]
+
+            # Filter enkel renners die in de database zitten
+            matched_riders = []
+            for rider in input_riders:
+                match = find_best_match(rider, st.session_state.all_riders)
+                if match:
+                    matched_riders.append(match)
+
+            if matched_riders:
+                st.session_state.selected_riders = matched_riders
+                st.success(f"{len(matched_riders)} renners toegevoegd!")
+            else:
+                st.warning("Geen renners gevonden. Controleer de spelling of probeer andere varianten.")
+
+
     # ✅ Selecteer renners
     st.subheader("📋 Selecteer je team")
     if "all_riders" not in st.session_state:
         st.session_state.all_riders = []
 
     selected_riders = st.multiselect(
-    "Kies jouw renners:", st.session_state.all_riders, default=st.session_state.get("selected_riders", []))
+    "Kies jouw renners:", st.session_state.all_riders, 
+    default=st.session_state.get("selected_riders", []))
 
     if st.button("🔍 Zoeken"):
         st.session_state.search_button = True
