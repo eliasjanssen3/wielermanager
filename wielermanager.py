@@ -57,7 +57,13 @@ def find_best_match(input_name, all_riders):
     normalized_input = normalize_name(input_name)
 
     # Zoek de beste match op basis van fuzzy matching
-    best_match, score = process.extractOne(normalized_input, normalized_riders.values())
+    match_result = process.extractOne(normalized_input, list(normalized_riders.values()))
+
+    if match_result is None:
+        return None  # Geen match gevonden
+
+    best_match = match_result[0]  # ✅ Correct uitlezen van het resultaat
+    score = match_result[1]  # ✅ Haal alleen de match en score op
 
     # Als de match goed genoeg is (bijv. minstens 80% overeenkomst), retourneer de originele naam
     if score > 80:
@@ -256,7 +262,7 @@ def get_next_race(races):
     for race_name, race_datetime, _ in races:
         race_time = datetime.strptime(race_datetime, "%Y-%m-%d %H:%M")
         if race_time > now:
-            return race_name  # Geef de eerstvolgende wedstrijd terug
+            return race_name  # ✅ Geef alleen de naam terug
 
     return races[-1][0]  # Als er geen toekomstige races zijn, geef de laatste terug
 
@@ -334,7 +340,7 @@ async def main():
 
         df = pd.DataFrame(results)
         df.index = df.index + 1
-        st.dataframe(df)
+        st.dataframe(df.drop(columns=["Datum"]))
 
         # 🎯 Overzicht per renner en wedstrijd
         st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
