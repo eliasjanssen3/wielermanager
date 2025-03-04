@@ -9,6 +9,7 @@ import os
 from rapidfuzz import process
 from datetime import datetime
 from datetime import timedelta
+import pytz
 
 # Inlezen van het Excel-bestand met prijzen
 # Zoek het pad naar het bestand in de repository
@@ -269,13 +270,23 @@ def get_next_race(races):
 
 # ⏳ Countdown naar de eerstvolgende koers
 def countdown_to_next_race():
-    now = datetime.now()
+    now_utc = datetime.now(pytz.utc)  # Huidige UTC tijd
+    cet = pytz.timezone("Europe/Brussels")  # Belgische tijdzone (CET/CEST)
+    now = now_utc.astimezone(cet)  # Zet UTC-tijd om naar CET/CEST
+
     for race_name, race_datetime, _ in races:
-        race_time = datetime.strptime(race_datetime, "%Y-%m-%d %H:%M")
+        race_time = datetime.strptime(race_datetime, "%Y-%m-%d %H:%M")  # Race tijd omzetten naar datetime object
+        race_time = cet.localize(race_time)  # Zorg ervoor dat de race tijd ook in CET is
+
         if race_time > now:
             countdown = race_time - now
-            return race_name, countdown
-    return None, None
+            days = countdown.days
+            hours, remainder = divmod(countdown.seconds, 3600)  # Uren berekenen
+            minutes = remainder // 60  # Minuten berekenen
+
+            return race_name, days, hours, minutes
+
+    return None, None, None, None
 
 # 🎯 Streamlit-app
 async def main():
@@ -415,11 +426,11 @@ async def main():
         df_rider_participation = add_prices_to_rider_participation(rider_participation)
         st.dataframe(df_rider_participation.set_index("Renner"))
 
-        # ⏳ Countdown naar de eerstvolgende koers onderaan de pagina
-        st.markdown("---")  # Voegt een scheidingslijn toe voor duidelijkheid
-        next_race, time_left = countdown_to_next_race()
+        # Zet de countdown onderaan de pagina
+        next_race, days, hours, minutes = countdown_to_next_race()
         if next_race:
-            st.subheader(f"⏳ Nog **{time_left.days} dagen en {time_left.seconds // 3600} uur** tot **{next_race}**!")
+            st.markdown("---")  # Voegt een scheidingslijn toe voor duidelijkheid
+            st.subheader(f"⏳ Nog **{days} dagen, {hours} uur en {minutes} minuten** tot **{next_race}**!")
 
 # 🎯 Start de Streamlit-app
 if __name__ == "__main__":
