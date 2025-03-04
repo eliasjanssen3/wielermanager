@@ -317,7 +317,8 @@ async def main():
                     matched_riders.append(match)
 
             if matched_riders:
-                st.session_state.selected_riders = matched_riders
+                # ❗ Vervang de bestaande selectie door de nieuwe lijst
+                st.session_state.selected_riders = matched_riders  
                 st.success(f"{len(matched_riders)} renners toegevoegd!")
             else:
                 st.warning("Geen renners gevonden. Controleer de spelling of probeer andere varianten.")
