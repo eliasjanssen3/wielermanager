@@ -115,7 +115,7 @@ races = [
     ("Kuurne-Brussel-Kuurne", "2025-03-02 12:14", "Niet-World Tour"),
     ("GP-Samyn", "2025-03-04 12:35", "Niet-World Tour"),
     ("Strade Bianche", "2025-03-08 11:25", "World Tour"),
-    ("Nokere Koers", "2025-03-19 12:55", "Niet-World Tour"),
+    ("Nokere Koerse", "2025-03-19 12:55", "Niet-World Tour"),
     ("Bredene Koksijde Classic", "2025-03-21 12:22", "Niet-World Tour"),
     ("Milano-Sanremo", "2025-03-22 13:00", "Monument"),
     ("Classic Brugge-De Panne", "2025-03-26 12:50", "World Tour"),
