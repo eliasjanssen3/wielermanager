@@ -398,7 +398,7 @@ async def main():
 
         # 🎯 Aangeraden transfers
         df_transfers = add_prices_to_recommended_transfers(recommended_transfers)
-        st.subheader("🔄 Voorgestelde transfers voor zwak bezette (toekomstige) wedstrijden")
+        st.subheader("🔄 Voorgestelde transfers voor zwak bezette toekomstige wedstrijden")
         st.dataframe(df_transfers.set_index("Renner"))
 
         # 🎯 Jouw renners per wedstrijd
