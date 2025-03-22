@@ -210,7 +210,9 @@ async def fetch_data(selected_riders):
     all_riders_participation = {}
 
     async with aiohttp.ClientSession() as session:
+        now = datetime.now()
         for race_name, race_date, category in races:
+            race_datetime = datetime.strptime(race_date, "%Y-%m-%d %H:%M")
             startlist = await get_startlist(session, race_name)
             if not startlist:
                 renners_count = "⚠️ Geen data"
@@ -223,7 +225,8 @@ async def fetch_data(selected_riders):
                     rider_participation[rider] += 1
                     rider_schedule[rider][race_name] = "✅"
 
-                if renners_count <= 7:
+                race_datetime = datetime.strptime(race_date, "%Y-%m-%d %H:%M")
+                if race_datetime > now and renners_count <= 9:
                     weak_races[race_name] = startlist
 
                 for rider in startlist:
@@ -395,7 +398,7 @@ async def main():
 
         # 🎯 Aangeraden transfers
         df_transfers = add_prices_to_recommended_transfers(recommended_transfers)
-        st.subheader("🔄 Voorgestelde transfers voor zwak bezette wedstrijden")
+        st.subheader("🔄 Voorgestelde transfers voor zwak bezette (toekomstige) wedstrijden")
         st.dataframe(df_transfers.set_index("Renner"))
 
         # 🎯 Jouw renners per wedstrijd
