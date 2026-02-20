@@ -161,9 +161,13 @@ async def fetch_all_riders():
 
 if "all_riders" not in st.session_state:
     st.session_state.all_riders = []
-    async def load_riders():
-        st.session_state.all_riders = await fetch_all_riders()
-    asyncio.run(load_riders())
+
+if not st.session_state.all_riders:
+    with st.spinner("🔄 Startlijsten laden..."):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        st.session_state.all_riders = loop.run_until_complete(fetch_all_riders())
+        loop.close()
 
 # ── Prijzen toevoegen aan dataframes ─────────────────────────────────────────
 def add_prices_to_recommended_transfers(recommended_transfers):
