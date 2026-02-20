@@ -8,7 +8,7 @@ import re
 import io
 from rapidfuzz import process
 from datetime import datetime
-import pytz
+import pytz 
 
 # ── Prijzen ophalen van Datawrapper ─────────────────────────────────────────
 PRIJZEN_URL = "https://datawrapper.dwcdn.net/dgT0d/7/dataset.csv"
