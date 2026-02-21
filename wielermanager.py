@@ -151,6 +151,9 @@ def get_rider_price(rider_name, df):
             return ""
     return ""
 
+def show_rider(r):
+    return r + get_rider_price(r, df_csv)
+
 # ── Achtergrond ───────────────────────────────────────────────────────────────
 st.markdown("""
     <style>
@@ -318,8 +321,10 @@ if st.button("✅ Voeg toe"):
 
 st.subheader("📋 Selecteer je team")
 selected_riders = st.multiselect(
-    "Kies jouw renners:", st.session_state.all_riders,
-    default=st.session_state.get("selected_riders", [])
+    "Kies jouw renners:",
+    st.session_state.all_riders,
+    default=st.session_state.get("selected_riders", []),
+    format_func=show_rider
 )
 
 if st.button("🔍 Zoeken"):
@@ -338,7 +343,11 @@ if st.session_state.search_button and selected_riders:
 
     st.subheader("🔍 Vergelijk mogelijke transfers")
     available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
-    transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", available_transfers)
+    transfer_riders = st.multiselect(
+    "Voer renners in om hun wedstrijdschema te vergelijken:",
+    available_transfers,
+    format_func=show_rider
+)
     if transfer_riders:
         with st.spinner("Bezig met ophalen van schema's..."):
             transfer_schedule = fetch_rider_schedule(transfer_riders)
