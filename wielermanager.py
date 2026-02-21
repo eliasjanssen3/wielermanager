@@ -117,7 +117,13 @@ races = [
 # ── Startlijst scrapen ────────────────────────────────────────────────────────
 async def get_startlist(session, race_name):
     race_url = f"https://www.procyclingstats.com/race/{race_name.replace(' ', '-').lower()}/2026/startlist"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
+        'Referer': 'https://www.procyclingstats.com/',
+        'Connection': 'keep-alive',
+    }
     async with session.get(race_url, headers=headers) as response:
         if response.status != 200:
             return []
