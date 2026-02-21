@@ -102,30 +102,30 @@ st.markdown("""
 
 # ── Wedstrijden ───────────────────────────────────────────────────────────────
 races = [
-    ("Omloop Het Nieuwsblad", "2025-03-01 11:30", "World Tour"),
-    ("Kuurne-Brussel-Kuurne", "2025-03-02 12:14", "Niet-World Tour"),
-    ("GP-Samyn", "2025-03-04 12:35", "Niet-World Tour"),
-    ("Strade Bianche", "2025-03-08 11:25", "World Tour"),
-    ("Nokere Koerse", "2025-03-19 12:55", "Niet-World Tour"),
-    ("Bredene Koksijde Classic", "2025-03-21 12:22", "Niet-World Tour"),
-    ("Milano-Sanremo", "2025-03-22 10:25", "Monument"),
-    ("Classic Brugge-De Panne", "2025-03-26 12:50", "World Tour"),
-    ("E3 Harelbeke", "2025-03-28 12:52", "World Tour"),
-    ("Gent-Wevelgem", "2025-03-30 10:50", "World Tour"),
-    ("Dwars door Vlaanderen", "2025-04-02 12:40", "World Tour"),
-    ("Ronde van Vlaanderen", "2025-04-06 10:17", "Monument"),
-    ("Scheldeprijs", "2025-04-09 13:09", "Niet-World Tour"),
-    ("Paris-Roubaix", "2025-04-13 14:00", "Monument"),
-    ("Ronde van Limburg", "2025-04-16 13:15", "Niet-World Tour"),
-    ("Brabantse Pijl", "2025-04-18 13:12", "Niet-World Tour"),
-    ("Amstel Gold Race", "2025-04-20 10:43", "World Tour"),
-    ("La Fleche Wallone", "2025-04-23 14:00", "World Tour"),
-    ("Liège-Bastogne-Liège", "2025-04-27 14:00", "Monument")
+    ("Omloop Het Nieuwsblad", "2025-02-28 11:30", "World Tour"),
+    ("Kuurne-Brussel-Kuurne", "2025-03-01 12:14", "Niet-World Tour"),
+    ("GP-Samyn", "2025-03-03 12:35", "Niet-World Tour"),
+    ("Strade Bianche", "2025-03-07 11:25", "World Tour"),
+    ("Nokere Koerse", "2025-03-18 12:55", "Niet-World Tour"),
+    ("Bredene Koksijde Classic", "2025-03-20 12:22", "Niet-World Tour"),
+    ("Milano-Sanremo", "2025-03-21 10:25", "Monument"),
+    ("Classic Brugge-De Panne", "2025-03-25 12:50", "World Tour"),
+    ("E3 Harelbeke", "2025-03-27 12:52", "World Tour"),
+    ("Gent-Wevelgem", "2025-03-29 10:50", "World Tour"),
+    ("Dwars door Vlaanderen", "2025-04-01 12:40", "World Tour"),
+    ("Ronde van Vlaanderen", "2025-04-05 10:17", "Monument"),
+    ("Scheldeprijs", "2025-04-08 13:09", "Niet-World Tour"),
+    ("Paris-Roubaix", "2025-04-12 14:00", "Monument"),
+    ("Ronde van Limburg", "2025-04-15 13:15", "Niet-World Tour"),
+    ("Brabantse Pijl", "2025-04-17 13:12", "Niet-World Tour"),
+    ("Amstel Gold Race", "2025-04-19 10:43", "World Tour"),
+    ("La Fleche Wallone", "2025-04-22 14:00", "World Tour"),
+    ("Liège-Bastogne-Liège", "2025-04-26 14:00", "Monument")
 ]
 
 # ── Startlijsten scrapen ──────────────────────────────────────────────────────
 async def get_startlist(session, race_name):
-    race_url = f"https://www.procyclingstats.com/race/{race_name.replace(' ', '-').lower()}/2025/startlist"
+    race_url = f"https://www.procyclingstats.com/race/{race_name.replace(' ', '-').lower()}/2026/startlist"
     async with session.get(race_url) as response:
         if response.status != 200:
             return []
