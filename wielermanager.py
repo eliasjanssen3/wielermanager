@@ -70,14 +70,29 @@ def pcs_format(name):
 
 # ── Naam normalisatie ─────────────────────────────────────────────────────────
 def normalize_name(name):
+    # ✅ Maak het safe voor NaN/None/niet-strings
+    if name is None:
+        return ""
+    # pandas NaN is float en is "not equal to itself"
+    try:
+        if name != name:  # NaN-check zonder pandas import
+            return ""
+    except Exception:
+        pass
+
+    if not isinstance(name, str):
+        name = str(name)
+
     replacements = {
         "Æ": "AE", "æ": "ae", "Ø": "O", "ø": "o",
         "Å": "A", "å": "a", "Č": "C", "č": "c",
         "Š": "S", "š": "s", "Đ": "D", "đ": "d",
         "Ž": "Z", "ž": "z", "Ć": "C", "ć": "c"
     }
+
     for special, replacement in replacements.items():
         name = name.replace(special, replacement)
+
     name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8')
     name = re.sub(r'[^a-zA-Z\s-]', '', name)
     return name.strip().lower()
