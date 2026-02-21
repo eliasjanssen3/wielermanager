@@ -165,19 +165,23 @@ async def fetch_all_riders():
             all_riders.update(startlist)
     return sorted(all_riders)
 
-# ── Riders laden bij opstarten (zelfde patroon als vorig jaar) ────────────────
+# ── Riders laden bij opstarten uit Excel ─────────────────────────────────────
 if "all_riders" not in st.session_state:
-    st.session_state.all_riders = []
-
-    async def load_riders():
-        st.session_state.all_riders = await fetch_all_riders()
-
-    try:
-        asyncio.run(load_riders())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(load_riders())
+    if os.path.exists(file_path):
+        # Laad rennersnamen uit Excel, converteer van ACHTERNAAM Voornaam naar Voornaam ACHTERNAAM
+        def to_pcs_format(name):
+            parts = name.strip().split()
+            if len(parts) >= 2:
+                # Zoek waar de voornaam begint (eerste woord dat niet volledig hoofdletters is)
+                for i, part in enumerate(parts):
+                    if not part.isupper():
+                        return ' '.join(parts[i:] + parts[:i])
+            return name
+        
+        excel_riders = df_prices["Renner"].tolist()
+        st.session_state.all_riders = sorted([to_pcs_format(r) for r in excel_riders])
+    else:
+        st.session_state.all_riders = []
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def add_prices_to_recommended_transfers(recommended_transfers):
