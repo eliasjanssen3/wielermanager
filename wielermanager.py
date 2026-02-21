@@ -58,11 +58,12 @@ def get_startlist_from_csv(race_name, df):
 
 def pcs_format(name):
     """Zet ACHTERNAAM Voornaam om naar Voornaam ACHTERNAAM."""
+    if not isinstance(name, str) or not name.strip():
+        return ""
     parts = name.strip().split()
     for i, part in enumerate(parts):
         if not part.isupper():
             return ' '.join(parts[i:] + parts[:i])
-    # Alles hoofdletters: eerste woord is achternaam
     if len(parts) >= 2:
         return ' '.join(parts[1:] + [parts[0].capitalize()])
     return name
@@ -171,7 +172,7 @@ df_csv = load_csv()
 # ── Renners laden bij opstarten uit CSV ───────────────────────────────────────
 if "all_riders" not in st.session_state:
     if not df_csv.empty:
-        st.session_state.all_riders = sorted([pcs_format(r) for r in df_csv["Renner"].tolist()])
+        st.session_state.all_riders = sorted([x for x in [pcs_format(r) for r in df_csv["Renner"].tolist()] if x])
     else:
         st.session_state.all_riders = []
 
