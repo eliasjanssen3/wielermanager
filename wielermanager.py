@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 import unicodedata
 import re
 import os
-import requests as req
 from rapidfuzz import process
 from datetime import datetime
 import pytz
@@ -14,19 +13,11 @@ import pytz
 # ── Prijzen laden uit Excel ───────────────────────────────────────────────────
 file_path = os.path.join(os.path.dirname(__file__), "data/PrijzenWielermanager.xlsx")
 
-@st.cache_data
-def load_prices():
-    if os.path.exists(file_path):
-        df = pd.read_excel(file_path, sheet_name='Blad1')
-        df.columns = ["Renner", "Prijs"]
-        df = df.dropna()
-        df["Prijs"] = pd.to_numeric(df["Prijs"], errors='coerce')
-        df = df.dropna(subset=['Prijs'])
-        df["Normalized"] = df["Renner"].apply(normalize_name)
-        return df
-    else:
-        st.warning("Prijzenbestand niet gevonden.")
-        return pd.DataFrame(columns=['Renner', 'Prijs', 'Normalized'])
+if os.path.exists(file_path):
+    df_prices = pd.read_excel(file_path, sheet_name='Blad1')
+    df_prices.columns = ["Renner", "Prijs"]
+    df_prices = df_prices.dropna()
+    df_prices["Prijs"] = pd.to_numeric(df_prices["Prijs"], errors='coerce')
 
 # ── Naam normalisatie ─────────────────────────────────────────────────────────
 def normalize_name(name):
@@ -45,15 +36,15 @@ def normalize_name(name):
 def find_best_match(input_name, all_riders):
     if not all_riders:
         return None
-    normalized_input = normalize_name(input_name)
     normalized_riders = {rider: normalize_name(rider) for rider in all_riders}
+    normalized_input = normalize_name(input_name)
 
     # 1. Exacte match
     for original, norm in normalized_riders.items():
         if norm == normalized_input:
             return original
 
-    # 2. Omgekeerde volgorde
+    # 2. Omgekeerde volgorde (bv. "van aert wout" → "wout van aert")
     words = normalized_input.split()
     reversed_input = ' '.join(reversed(words)) if len(words) >= 2 else None
     if reversed_input:
@@ -78,28 +69,27 @@ def find_best_match(input_name, all_riders):
     return None
 
 def get_rider_price(rider_name):
-    df_prices = load_prices()
-    if df_prices.empty:
+    if 'df_prices' not in globals() or df_prices.empty:
         return ""
-    normalized_input = normalize_name(rider_name)
-    price_row = df_prices[df_prices["Normalized"] == normalized_input]
+    normalized_rider_name = normalize_name(rider_name)
+    df_prices["Normalized"] = df_prices["Renner"].apply(normalize_name)
+    price_row = df_prices[df_prices["Normalized"] == normalized_rider_name]
     if price_row.empty:
-        for idx, norm_name in enumerate(df_prices["Normalized"]):
-            if normalized_input in norm_name or norm_name in normalized_input:
-                price_row = df_prices.iloc[[idx]]
+        for excel_name in df_prices["Normalized"]:
+            if normalized_rider_name in excel_name or excel_name in normalized_rider_name:
+                price_row = df_prices[df_prices["Normalized"] == excel_name]
                 break
-    if price_row.empty:
-        match_result = process.extractOne(normalized_input, df_prices["Normalized"].tolist())
-        if match_result and match_result[1] > 85:
-            price_row = df_prices[df_prices["Normalized"] == match_result[0]]
     return f" ({int(price_row.iloc[0]['Prijs'])}M)" if not price_row.empty else ""
 
 # ── Achtergrond ───────────────────────────────────────────────────────────────
-st.markdown("""
-    <style>
-    .stApp { background: linear-gradient(to bottom, #e3f2fd, #bbdefb); }
-    </style>
-""", unsafe_allow_html=True)
+def set_background():
+    st.markdown("""
+        <style>
+        .stApp { background: linear-gradient(to bottom, #e3f2fd, #bbdefb); }
+        </style>
+    """, unsafe_allow_html=True)
+
+set_background()
 
 # ── Wedstrijden ───────────────────────────────────────────────────────────────
 races = [
@@ -124,45 +114,72 @@ races = [
     ("Liège-Bastogne-Liège", "2026-04-26 14:00", "Monument")
 ]
 
-# ── Startlijsten synchroon ophalen (werkt op Streamlit Cloud) ─────────────────
-@st.cache_data(ttl=3600)
-def fetch_startlist_sync(race_name):
-    url = f"https://www.procyclingstats.com/race/{race_name.replace(' ', '-').lower()}/2026/startlist"
-    try:
-        response = req.get(url, timeout=10)
-        if response.status_code != 200:
-            return []
-        soup = BeautifulSoup(response.text, "html.parser")
-        riders = [r.text.strip() for r in soup.select("div.ridersCont ul li a, ul.riders li a")]
-        return riders
-    except Exception:
-        return []
-
-@st.cache_data(ttl=3600)
-def fetch_all_riders_sync():
-    all_riders = set()
-    for race_name, _, _ in races:
-        startlist = fetch_startlist_sync(race_name)
-        all_riders.update(startlist)
-    return sorted(all_riders)
-
-# ── Riders laden bij opstarten ────────────────────────────────────────────────
-if "all_riders" not in st.session_state:
-    st.session_state.all_riders = []
-
-if not st.session_state.all_riders:
-    with st.spinner("🔄 Startlijsten laden, even geduld..."):
-        st.session_state.all_riders = fetch_all_riders_sync()
-
-# ── Async functies voor zoeken ────────────────────────────────────────────────
-async def get_startlist_async(session, race_name):
+# ── Startlijst scrapen ────────────────────────────────────────────────────────
+async def get_startlist(session, race_name):
     race_url = f"https://www.procyclingstats.com/race/{race_name.replace(' ', '-').lower()}/2026/startlist"
-    async with session.get(race_url) as response:
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+    async with session.get(race_url, headers=headers) as response:
         if response.status != 200:
             return []
         soup = BeautifulSoup(await response.text(), "html.parser")
-        riders = [r.text.strip() for r in soup.select("div.ridersCont ul li a, ul.riders li a")]
-        return riders if riders else []
+        startlist = [rider.text.strip() for rider in soup.select("div.ridersCont ul li a, ul.riders li a")]
+        return startlist if startlist else []
+
+async def fetch_all_riders():
+    all_riders = set()
+    async with aiohttp.ClientSession() as session:
+        tasks = [get_startlist(session, race_name) for race_name, _, _ in races]
+        results = await asyncio.gather(*tasks)
+        for startlist in results:
+            all_riders.update(startlist)
+    return sorted(all_riders)
+
+# ── Riders laden bij opstarten (zelfde patroon als vorig jaar) ────────────────
+if "all_riders" not in st.session_state:
+    st.session_state.all_riders = []
+
+    async def load_riders():
+        st.session_state.all_riders = await fetch_all_riders()
+
+    try:
+        asyncio.run(load_riders())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(load_riders())
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def add_prices_to_recommended_transfers(recommended_transfers):
+    df = pd.DataFrame(
+        sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
+        columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
+    )
+    df["Prijs"] = df["Renner"].apply(get_rider_price)
+    df["Renner"] = df["Renner"] + df["Prijs"]
+    df.drop(columns=["Prijs"], inplace=True)
+    return df
+
+def add_prices_to_rider_participation(rider_participation):
+    df = pd.DataFrame(
+        sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
+        columns=["Renner", "Aantal deelnames"]
+    )
+    df["Prijs"] = df["Renner"].apply(get_rider_price)
+    df["Renner"] = df["Renner"] + df["Prijs"]
+    df.drop(columns=["Prijs"], inplace=True)
+    return df
+
+def add_prices_to_rider_schedule(rider_schedule):
+    updated_schedule = {}
+    for rider, race_data in rider_schedule.items():
+        updated_schedule[rider + get_rider_price(rider)] = race_data
+    return updated_schedule
+
+def add_prices_to_transfer_schedule(transfer_rider_schedule):
+    updated_schedule = {}
+    for rider, race_data in transfer_rider_schedule.items():
+        updated_schedule[rider + get_rider_price(rider)] = race_data
+    return updated_schedule
 
 async def fetch_data(selected_riders):
     results = []
@@ -174,7 +191,7 @@ async def fetch_data(selected_riders):
         now = datetime.now()
         for race_name, race_date, category in races:
             race_datetime = datetime.strptime(race_date, "%Y-%m-%d %H:%M")
-            startlist = fetch_startlist_sync(race_name)
+            startlist = await get_startlist(session, race_name)
             if not startlist:
                 renners_count = "⚠️ Geen data"
                 team_riders = []
@@ -196,16 +213,17 @@ async def fetch_data(selected_riders):
 
     return results, rider_participation, rider_schedule, recommended_transfers
 
-def fetch_rider_schedule(selected_riders):
+async def get_rider_schedule(selected_riders):
     rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
-    for race_name, _, _ in races:
-        startlist = fetch_startlist_sync(race_name)
-        for rider in selected_riders:
-            if rider in startlist:
-                rider_schedule[rider][race_name] = "✅"
+    async with aiohttp.ClientSession() as session:
+        for race_name, _, _ in races:
+            startlist = await get_startlist(session, race_name)
+            for rider in selected_riders:
+                if rider in startlist:
+                    rider_schedule[rider][race_name] = "✅"
     return rider_schedule
 
-def get_next_race():
+def get_next_race(races):
     now = datetime.now()
     for race_name, race_datetime, _ in races:
         if datetime.strptime(race_datetime, "%Y-%m-%d %H:%M") > now:
@@ -225,114 +243,118 @@ def countdown_to_next_race():
             return race_name, days, hours, minutes
     return None, None, None, None
 
-def add_prices_to_schedule(schedule):
-    return {rider + get_rider_price(rider): rs for rider, rs in schedule.items()}
+# ── Streamlit app ─────────────────────────────────────────────────────────────
+async def main():
+    st.title("🚴 Wielermanager Tools")
 
-def add_prices_to_recommended_transfers(recommended_transfers):
-    df = pd.DataFrame(
-        sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
+    if "all_riders" not in st.session_state:
+        st.session_state.all_riders = []
+    if "search_button" not in st.session_state:
+        st.session_state.search_button = False
+    if "selected_riders" not in st.session_state:
+        st.session_state.selected_riders = []
+
+    if st.session_state.get("search_button", False) and st.session_state.get("selected_riders", []):
+        with st.spinner("Bezig met zoeken in startlijsten..."):
+            async with aiohttp.ClientSession() as session:
+                all_riders = set()
+                for race_name, _, _ in races:
+                    startlist = await get_startlist(session, race_name)
+                    all_riders.update(startlist)
+            st.session_state.all_riders = sorted(all_riders)
+
+    st.subheader("📋 Snel jouw team invoeren")
+    rider_input = st.text_area(
+        "Plak of typ rennersnamen, gescheiden door komma's of nieuwe regels:",
+        placeholder="bv: wout van aert, van der poel, pogacar..."
     )
-    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
-    return df
 
-def add_prices_to_rider_participation(rider_participation):
-    df = pd.DataFrame(
-        sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal deelnames"]
+    if st.button("✅ Voeg toe"):
+        if rider_input:
+            input_riders = re.split(r',|\n', rider_input)
+            input_riders = [r.strip() for r in input_riders if r.strip()]
+            matched_riders = []
+            niet_gevonden = []
+            for rider in input_riders:
+                match = find_best_match(rider, st.session_state.all_riders)
+                if match:
+                    matched_riders.append(match)
+                else:
+                    niet_gevonden.append(rider)
+            if matched_riders:
+                st.session_state.selected_riders = matched_riders
+                st.success(f"✅ {len(matched_riders)} renners toegevoegd!")
+            if niet_gevonden:
+                st.warning(f"⚠️ Niet gevonden: {', '.join(niet_gevonden)}")
+            if len(matched_riders) != 20:
+                st.warning(f"⚠️ Let op! Je hebt {len(matched_riders)} renners geselecteerd (verwacht: 20).")
+
+    st.subheader("📋 Selecteer je team")
+    selected_riders = st.multiselect(
+        "Kies jouw renners:", st.session_state.all_riders,
+        default=st.session_state.get("selected_riders", [])
     )
-    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
-    return df
 
-# ── Streamlit UI ──────────────────────────────────────────────────────────────
-st.title("🚴 Wielermanager Tools")
+    if st.button("🔍 Zoeken"):
+        st.session_state.search_button = True
 
-if "search_button" not in st.session_state:
-    st.session_state.search_button = False
-if "selected_riders" not in st.session_state:
-    st.session_state.selected_riders = []
+    if st.session_state.search_button and selected_riders:
+        results, rider_participation, rider_schedule, recommended_transfers = await fetch_data(selected_riders)
 
-st.subheader("📋 Snel jouw team invoeren")
-rider_input = st.text_area(
-    "Plak of typ rennersnamen, gescheiden door komma's of nieuwe regels:",
-    placeholder="bv: wout van aert, van der poel, pogacar..."
-)
+        df = pd.DataFrame(results)
+        df.index = df.index + 1
+        st.dataframe(df.drop(columns=["Datum"]))
 
-if st.button("✅ Voeg toe"):
-    if rider_input:
-        input_riders = re.split(r'[,\n]', rider_input)
-        input_riders = [r.strip() for r in input_riders if r.strip()]
-        matched_riders = []
-        niet_gevonden = []
-        for rider in input_riders:
-            match = find_best_match(rider, st.session_state.all_riders)
-            if match:
-                matched_riders.append(match)
+        st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
+        rider_schedule_with_prices = add_prices_to_rider_schedule(rider_schedule)
+        st.dataframe(pd.DataFrame.from_dict(rider_schedule_with_prices, orient="index").sort_index())
+
+        st.subheader("🔍 Vergelijk mogelijke transfers")
+        available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
+        transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", available_transfers)
+        transfer_rider_schedule = {}
+        if transfer_riders:
+            with st.spinner("Bezig met ophalen van schema's..."):
+                transfer_rider_schedule = await get_rider_schedule(transfer_riders)
+        if transfer_rider_schedule:
+            st.subheader("📅 Wedstrijdschema van mogelijke transfers")
+            st.dataframe(pd.DataFrame.from_dict(add_prices_to_transfer_schedule(transfer_rider_schedule), orient="index").sort_index())
+
+        df_transfers = add_prices_to_recommended_transfers(recommended_transfers)
+        st.subheader("🔄 Voorgestelde transfers voor zwak bezette toekomstige wedstrijden")
+        st.dataframe(df_transfers.set_index("Renner"))
+
+        next_race = get_next_race(races)
+        st.subheader("🏁 Jouw startlijst per wedstrijd")
+        wedstrijd_optie = st.selectbox(
+            "Selecteer een wedstrijd om jouw renners te zien:",
+            [race[0] for race in races],
+            index=[race[0] for race in races].index(next_race)
+        )
+
+        if wedstrijd_optie:
+            async with aiohttp.ClientSession() as session:
+                startlist = await get_startlist(session, wedstrijd_optie)
+            team_riders = [rider for rider in selected_riders if rider in startlist]
+            st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
+            if team_riders:
+                for rider in sorted(team_riders):
+                    st.success(f"✅ **{rider}**")
             else:
-                niet_gevonden.append(rider)
-        if matched_riders:
-            st.session_state.selected_riders = matched_riders
-            st.success(f"✅ {len(matched_riders)} renners toegevoegd!")
-        if niet_gevonden:
-            st.warning(f"⚠️ Niet gevonden: {', '.join(niet_gevonden)}")
-        if len(matched_riders) != 20:
-            st.warning(f"⚠️ Let op! Je hebt {len(matched_riders)} renners geselecteerd (verwacht: 20).")
+                st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
 
-st.subheader("📋 Selecteer je team")
-selected_riders = st.multiselect(
-    "Kies jouw renners:", st.session_state.all_riders,
-    default=st.session_state.get("selected_riders", [])
-)
+        st.subheader("📊 Deelnames per renner")
+        st.dataframe(add_prices_to_rider_participation(rider_participation).set_index("Renner"))
 
-if st.button("🔍 Zoeken"):
-    st.session_state.search_button = True
+        next_race, days, hours, minutes = countdown_to_next_race()
+        if next_race:
+            st.markdown("---")
+            st.subheader(f"⏳ Nog **{days} dagen, {hours} uur en {minutes} minuten** tot **{next_race}**!")
 
-if st.session_state.search_button and selected_riders:
-    with st.spinner("Bezig met ophalen van data..."):
-        results, rider_participation, rider_schedule, recommended_transfers = asyncio.run(fetch_data(selected_riders))
-
-    df = pd.DataFrame(results)
-    df.index = df.index + 1
-    st.dataframe(df.drop(columns=["Datum"]))
-
-    st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
-    st.dataframe(pd.DataFrame.from_dict(add_prices_to_schedule(rider_schedule), orient="index").sort_index())
-
-    st.subheader("🔍 Vergelijk mogelijke transfers")
-    available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
-    transfer_riders = st.multiselect("Voer renners in om hun wedstrijdschema te vergelijken:", available_transfers)
-
-    if transfer_riders:
-        with st.spinner("Bezig met ophalen van schema's..."):
-            transfer_schedule = fetch_rider_schedule(transfer_riders)
-        st.subheader("📅 Wedstrijdschema van mogelijke transfers")
-        st.dataframe(pd.DataFrame.from_dict(add_prices_to_schedule(transfer_schedule), orient="index").sort_index())
-
-    st.subheader("🔄 Voorgestelde transfers voor zwak bezette toekomstige wedstrijden")
-    st.dataframe(add_prices_to_recommended_transfers(recommended_transfers).set_index("Renner"))
-
-    st.subheader("🏁 Jouw startlijst per wedstrijd")
-    next_race = get_next_race()
-    wedstrijd_optie = st.selectbox(
-        "Selecteer een wedstrijd:",
-        [race[0] for race in races],
-        index=[race[0] for race in races].index(next_race)
-    )
-
-    if wedstrijd_optie:
-        startlist = fetch_startlist_sync(wedstrijd_optie)
-        team_riders = [rider for rider in selected_riders if rider in startlist]
-        st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
-        if team_riders:
-            for rider in sorted(team_riders):
-                st.success(f"✅ **{rider}**")
-        else:
-            st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
-
-    st.subheader("📊 Deelnames per renner")
-    st.dataframe(add_prices_to_rider_participation(rider_participation).set_index("Renner"))
-
-    next_race, days, hours, minutes = countdown_to_next_race()
-    if next_race:
-        st.markdown("---")
-        st.subheader(f"⏳ Nog **{days} dagen, {hours} uur en {minutes} minuten** tot **{next_race}**!")
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
