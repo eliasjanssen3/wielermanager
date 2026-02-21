@@ -5,29 +5,26 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import unicodedata
 import re
-import io
+import os
 from rapidfuzz import process
 from datetime import datetime
 import pytz
-import requests
 
-# ── Prijzen ophalen van Datawrapper ──────────────────────────────────────────
-PRIJZEN_URL = "https://datawrapper.dwcdn.net/dgT0d/7/dataset.csv"
+# ── Prijzen laden uit Excel ───────────────────────────────────────────────────
+file_path = os.path.join(os.path.dirname(__file__), "data/PrijzenWielermanager.xlsx")
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_prices():
-    try:
-        response = requests.get(PRIJZEN_URL, timeout=10)
-        response.raise_for_status()
-        df = pd.read_csv(io.StringIO(response.text))
-        df = df[['Renner', '€']].dropna()
-        df.columns = ['Renner', 'Prijs']
-        df['Prijs'] = pd.to_numeric(df['Prijs'], errors='coerce')
+    if os.path.exists(file_path):
+        df = pd.read_excel(file_path, sheet_name='Blad1')
+        df.columns = ["Renner", "Prijs"]
+        df = df.dropna()
+        df["Prijs"] = pd.to_numeric(df["Prijs"], errors='coerce')
         df = df.dropna(subset=['Prijs'])
-        df['Normalized'] = df['Renner'].apply(normalize_name)
+        df["Normalized"] = df["Renner"].apply(normalize_name)
         return df
-    except Exception as e:
-        st.warning(f"⚠️ Kon prijzen niet ophalen: {e}")
+    else:
+        st.warning("Prijzenbestand niet gevonden.")
         return pd.DataFrame(columns=['Renner', 'Prijs', 'Normalized'])
 
 # ── Naam normalisatie ─────────────────────────────────────────────────────────
@@ -45,13 +42,8 @@ def normalize_name(name):
     return name.strip().lower()
 
 def find_best_match(input_name, all_riders):
-    """
-    Flexibele matching: hoofdletterongevoelig, accenten, spaties, volgorde van voor-/achternaam.
-    Werkt ook als je 'wout van aert', 'Van Aert', 'van aert wout' intypt.
-    """
     if not all_riders:
         return None
-
     normalized_input = normalize_name(input_name)
     normalized_riders = {rider: normalize_name(rider) for rider in all_riders}
 
@@ -60,28 +52,27 @@ def find_best_match(input_name, all_riders):
         if norm == normalized_input:
             return original
 
-    # 2. Probeer omgekeerde volgorde (voornaam achternaam → achternaam voornaam)
+    # 2. Omgekeerde volgorde
     words = normalized_input.split()
-    if len(words) >= 2:
-        reversed_input = ' '.join(reversed(words))
+    reversed_input = ' '.join(reversed(words)) if len(words) >= 2 else None
+    if reversed_input:
         for original, norm in normalized_riders.items():
             if norm == reversed_input:
                 return original
 
-    # 3. Fuzzy match op originele invoer
-    match_result = process.extractOne(normalized_input, list(normalized_riders.values()))
-    if match_result and match_result[1] > 75:
-        for original, norm in normalized_riders.items():
-            if norm == match_result[0]:
-                return original
+    # 3. Fuzzy match op beide varianten
+    match1 = process.extractOne(normalized_input, list(normalized_riders.values()))
+    match2 = process.extractOne(reversed_input, list(normalized_riders.values())) if reversed_input else None
 
-    # 4. Fuzzy match op omgekeerde volgorde
-    if len(words) >= 2:
-        match_result2 = process.extractOne(reversed_input, list(normalized_riders.values()))
-        if match_result2 and match_result2[1] > 75:
-            for original, norm in normalized_riders.items():
-                if norm == match_result2[0]:
-                    return original
+    if match1 and match2:
+        best = match1 if match1[1] >= match2[1] else match2
+    else:
+        best = match1 or match2
+
+    if best and best[1] > 75:
+        for original, norm in normalized_riders.items():
+            if norm == best[0]:
+                return original
 
     return None
 
@@ -89,25 +80,17 @@ def get_rider_price(rider_name):
     df_prices = load_prices()
     if df_prices.empty:
         return ""
-
     normalized_input = normalize_name(rider_name)
-
-    # Exacte match
     price_row = df_prices[df_prices["Normalized"] == normalized_input]
-
-    # Gedeeltelijke match
     if price_row.empty:
         for idx, norm_name in enumerate(df_prices["Normalized"]):
             if normalized_input in norm_name or norm_name in normalized_input:
                 price_row = df_prices.iloc[[idx]]
                 break
-
-    # Fuzzy match
     if price_row.empty:
         match_result = process.extractOne(normalized_input, df_prices["Normalized"].tolist())
         if match_result and match_result[1] > 85:
             price_row = df_prices[df_prices["Normalized"] == match_result[0]]
-
     return f" ({int(price_row.iloc[0]['Prijs'])}M)" if not price_row.empty else ""
 
 # ── Achtergrond ───────────────────────────────────────────────────────────────
@@ -191,7 +174,7 @@ def add_prices_to_rider_participation(rider_participation):
     return df
 
 def add_prices_to_schedule(schedule):
-    return {rider + get_rider_price(rider): races_sched for rider, races_sched in schedule.items()}
+    return {rider + get_rider_price(rider): rs for rider, rs in schedule.items()}
 
 async def fetch_data(selected_riders):
     results = []
@@ -215,13 +198,7 @@ async def fetch_data(selected_riders):
                     rider_schedule[rider][race_name] = "✅"
                 if race_datetime > now and renners_count <= 9:
                     weak_races[race_name] = startlist
-
-            results.append({
-                "Wedstrijd": race_name,
-                "Datum": race_date,
-                "Categorie": category,
-                "Aantal renners": str(renners_count)
-            })
+            results.append({"Wedstrijd": race_name, "Datum": race_date, "Categorie": category, "Aantal renners": str(renners_count)})
 
     recommended_transfers = {}
     for race, race_riders in weak_races.items():
@@ -270,7 +247,6 @@ async def main():
     if "selected_riders" not in st.session_state:
         st.session_state.selected_riders = []
 
-    # ── Snel invoeren ──
     st.subheader("📋 Snel jouw team invoeren")
     rider_input = st.text_area(
         "Plak of typ rennersnamen, gescheiden door komma's of nieuwe regels:",
@@ -289,7 +265,6 @@ async def main():
                     matched_riders.append(match)
                 else:
                     niet_gevonden.append(rider)
-
             if matched_riders:
                 st.session_state.selected_riders = matched_riders
                 st.success(f"✅ {len(matched_riders)} renners toegevoegd!")
@@ -298,7 +273,6 @@ async def main():
             if len(matched_riders) != 20:
                 st.warning(f"⚠️ Let op! Je hebt {len(matched_riders)} renners geselecteerd (verwacht: 20).")
 
-    # ── Multiselect ──
     st.subheader("📋 Selecteer je team")
     selected_riders = st.multiselect(
         "Kies jouw renners:", st.session_state.all_riders,
@@ -316,8 +290,7 @@ async def main():
         st.dataframe(df.drop(columns=["Datum"]))
 
         st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
-        schedule_df = pd.DataFrame.from_dict(add_prices_to_schedule(rider_schedule), orient="index")
-        st.dataframe(schedule_df.sort_index())
+        st.dataframe(pd.DataFrame.from_dict(add_prices_to_schedule(rider_schedule), orient="index").sort_index())
 
         st.subheader("🔍 Vergelijk mogelijke transfers")
         available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
