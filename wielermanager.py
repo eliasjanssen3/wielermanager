@@ -91,6 +91,31 @@ def set_background():
 
 set_background()
 
+# ── DEBUG ─────────────────────────────────────────────────────────────────────
+import requests as req_debug
+with st.expander('🔧 Debug info'):
+    test_url = 'https://www.procyclingstats.com/race/omloop-het-nieuwsblad/2026/startlist'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.procyclingstats.com/',
+    }
+    try:
+        r = req_debug.get(test_url, headers=headers, timeout=10)
+        st.write(f'Status code: {r.status_code}')
+        st.write(f'Aantal riders in session_state: {len(st.session_state.all_riders)}')
+        from bs4 import BeautifulSoup as BS
+        soup = BS(r.text, 'html.parser')
+        riders = [x.text.strip() for x in soup.select('div.ridersCont ul li a, ul.riders li a')]
+        st.write(f'Riders gevonden op PCS: {len(riders)}')
+        if riders:
+            st.write(f'Eerste 5: {riders[:5]}')
+        else:
+            st.write('HTML snippet:')
+            st.code(r.text[:2000])
+    except Exception as e:
+        st.error(f'Fout: {e}')
+
+
 # ── Wedstrijden ───────────────────────────────────────────────────────────────
 races = [
     ("Omloop Het Nieuwsblad", "2026-02-28 11:30", "World Tour"),
