@@ -205,7 +205,7 @@ df_csv = load_csv()
 # ── Renners laden bij opstarten uit CSV ───────────────────────────────────────
 if "all_riders" not in st.session_state:
     if not df_csv.empty:
-        st.session_state.all_riders = sorted([x for x in [pcs_format(r) for r in df_csv["Renner"].tolist()] if x])
+        st.session_state.all_riders = sorted([x for x in [pcs_format(r) for r in df_csv["Renner"].dropna().tolist()] if x and not x[0].isdigit()])
     else:
         st.session_state.all_riders = []
 
