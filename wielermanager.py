@@ -138,29 +138,28 @@ def find_best_match(input_name, all_riders):
 def get_rider_price(rider_name):
     if df_csv.empty:
         return ""
-    normalized_input = normalize_name(rider_name)
-    # Ook omgekeerde volgorde proberen (Voornaam ACHTERNAAM → ACHTERNAAM Voornaam)
-    words = normalized_input.split()
-    reversed_input = normalize_name(' '.join(reversed(words))) if len(words) >= 2 else None
 
+    normalized_input = normalize_name(rider_name)
     df = df_csv.copy()
     df["Normalized"] = df["Renner"].apply(normalize_name)
 
-    # Exacte match
+    # 1. Exacte match
     price_row = df[df["Normalized"] == normalized_input]
-    # Omgekeerde volgorde
-    if price_row.empty and reversed_input:
-        price_row = df[df["Normalized"] == reversed_input]
-    # Gedeeltelijke match
+
+    # 2. Alle splits van voornaam/achternaam proberen
+    # bv "arnaud de lie" → probeer "de lie arnaud", "lie arnaud de", etc.
     if price_row.empty:
-        for idx, norm_name in enumerate(df["Normalized"]):
-            if normalized_input in norm_name or norm_name in normalized_input:
-                price_row = df.iloc[[idx]]
+        words = normalized_input.split()
+        for i in range(1, len(words)):
+            variant = ' '.join(words[i:] + words[:i])
+            price_row = df[df["Normalized"] == variant]
+            if not price_row.empty:
                 break
-    # Fuzzy match
+
+    # 3. Fuzzy match als laatste redmiddel
     if price_row.empty:
         match_result = process.extractOne(normalized_input, df["Normalized"].tolist())
-        if match_result and match_result[1] > 85:
+        if match_result and match_result[1] > 80:
             price_row = df[df["Normalized"] == match_result[0]]
 
     if not price_row.empty and "€" in price_row.columns:
