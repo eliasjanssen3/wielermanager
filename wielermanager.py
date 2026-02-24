@@ -11,7 +11,7 @@ from datetime import datetime
 import pytz
 
 # ── Prijzen en programma's laden uit Datawrapper CSV ─────────────────────────
-DATAWRAPPER_URL = "https://datawrapper.dwcdn.net/dgT0d/latest/dataset.csv"
+DATAWRAPPER_URL = "https://datawrapper.dwcdn.net/dgT0d/10/dataset.csv"
 
 # Race afkortingen in CSV → volledige namen
 RACE_AFKORTINGEN = {
@@ -289,6 +289,11 @@ if "search_button" not in st.session_state:
     st.session_state.search_button = False
 if "selected_riders" not in st.session_state:
     st.session_state.selected_riders = []
+
+if st.button("🔄 Ververs data"):
+    st.cache_data.clear()
+    st.session_state.all_riders = []
+    st.rerun()
 
 st.subheader("📋 Snel jouw team invoeren")
 rider_input = st.text_area(
