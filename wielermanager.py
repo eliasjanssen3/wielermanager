@@ -135,23 +135,35 @@ def find_best_match(input_name, all_riders):
                 return original
     return None
 
-def get_rider_price(rider_name, df):
-    if df.empty:
+def get_rider_price(rider_name):
+    if df_csv.empty:
         return ""
     normalized_input = normalize_name(rider_name)
-    df = df.copy()
+    # Ook omgekeerde volgorde proberen (Voornaam ACHTERNAAM → ACHTERNAAM Voornaam)
+    words = normalized_input.split()
+    reversed_input = normalize_name(' '.join(reversed(words))) if len(words) >= 2 else None
+
+    df = df_csv.copy()
     df["Normalized"] = df["Renner"].apply(normalize_name)
+
+    # Exacte match
     price_row = df[df["Normalized"] == normalized_input]
+    # Omgekeerde volgorde
+    if price_row.empty and reversed_input:
+        price_row = df[df["Normalized"] == reversed_input]
+    # Gedeeltelijke match
     if price_row.empty:
         for idx, norm_name in enumerate(df["Normalized"]):
             if normalized_input in norm_name or norm_name in normalized_input:
                 price_row = df.iloc[[idx]]
                 break
+    # Fuzzy match
     if price_row.empty:
         match_result = process.extractOne(normalized_input, df["Normalized"].tolist())
         if match_result and match_result[1] > 85:
             price_row = df[df["Normalized"] == match_result[0]]
-    if not price_row.empty and '€' in price_row.columns:
+
+    if not price_row.empty and "€" in price_row.columns:
         try:
             return f" ({int(price_row.iloc[0]['€'])}M)"
         except:
@@ -200,14 +212,14 @@ if "all_riders" not in st.session_state:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def add_prices_to_schedule(schedule):
-    return {rider + get_rider_price(rider, df_csv): rs for rider, rs in schedule.items()}
+    return {rider + get_rider_price(rider): rs for rider, rs in schedule.items()}
 
 def add_prices_to_recommended_transfers(recommended_transfers):
     df = pd.DataFrame(
         sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
         columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
     )
-    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r, df_csv))
+    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
     return df
 
 def add_prices_to_rider_participation(rider_participation):
@@ -215,7 +227,7 @@ def add_prices_to_rider_participation(rider_participation):
         sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
         columns=["Renner", "Aantal deelnames"]
     )
-    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r, df_csv))
+    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
     return df
 
 def fetch_data(selected_riders):
@@ -369,7 +381,7 @@ if st.session_state.search_button and selected_riders:
         st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
         if team_riders:
             for rider in sorted(team_riders):
-                st.success(f"✅ **{rider}**")
+                st.success(f"✅ **{rider}{get_rider_price(rider)}**")
         else:
             st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
 
