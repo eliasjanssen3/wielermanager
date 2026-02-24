@@ -353,7 +353,15 @@ if st.session_state.search_button and selected_riders:
     st.dataframe(df.drop(columns=["Datum"]))
 
     st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
-    st.dataframe(pd.DataFrame.from_dict(add_prices_to_schedule(rider_schedule), orient="index").sort_index())
+    schedule_with_prices = add_prices_to_schedule(rider_schedule)
+    schedule_df = pd.DataFrame.from_dict(schedule_with_prices, orient="index")
+    # Sorteer op prijs (hoog naar laag), prijs staat tussen haakjes bv " (14M)"
+    def extract_price(name):
+        import re
+        m = re.search(r"\((\d+)M\)", name)
+        return int(m.group(1)) if m else 0
+    schedule_df = schedule_df.iloc[sorted(range(len(schedule_df)), key=lambda i: extract_price(schedule_df.index[i]), reverse=True)]
+    st.dataframe(schedule_df)
 
     st.subheader("🔍 Vergelijk mogelijke transfers")
     available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
