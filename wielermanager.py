@@ -38,14 +38,21 @@ RACE_AFKORTINGEN = {
 
 @st.cache_data(ttl=300)  # refresh elke 5 minuten
 def load_csv():
-    try:
-        r = req.get(DATAWRAPPER_URL, timeout=10)
-        r.raise_for_status()
-        df = pd.read_csv(io.StringIO(r.text))
-        return df
-    except Exception as e:
-        st.warning(f"⚠️ Kon CSV niet ophalen: {e}")
-        return pd.DataFrame()
+    """Haalt altijd de nieuwste versie op door versienummers af te proberen."""
+    base = "https://datawrapper.dwcdn.net/dgT0d"
+    # Probeer versies van hoog naar laag
+    for version in range(20, 0, -1):
+        url = f"{base}/{version}/dataset.csv"
+        try:
+            r = req.get(url, timeout=5)
+            if r.status_code == 200:
+                df = pd.read_csv(io.StringIO(r.text))
+                if not df.empty:
+                    return df
+        except Exception:
+            continue
+    st.warning("⚠️ Kon CSV niet ophalen.")
+    return pd.DataFrame()
 
 def get_startlist_from_csv(race_name, df):
     """Geeft lijst van renners die een X hebben voor de gegeven race."""
