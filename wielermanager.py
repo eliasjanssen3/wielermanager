@@ -11,7 +11,7 @@ from datetime import datetime
 import pytz
 
 # ── Prijzen en programma's laden uit Datawrapper CSV ─────────────────────────
-DATAWRAPPER_URL = "https://datawrapper.dwcdn.net/dgT0d/7/dataset.csv"
+DATAWRAPPER_URL = "https://datawrapper.dwcdn.net/dgT0d/latest/dataset.csv"
 
 # Race afkortingen in CSV → volledige namen
 RACE_AFKORTINGEN = {
