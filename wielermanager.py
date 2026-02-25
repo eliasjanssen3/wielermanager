@@ -41,7 +41,7 @@ def load_csv():
     """Haalt altijd de nieuwste versie op door versienummers af te proberen."""
     base = "https://datawrapper.dwcdn.net/dgT0d"
     # Probeer versies van hoog naar laag
-    for version in range(30, 0, -1):
+    for version in range(40, 0, -1):
         url = f"{base}/{version}/dataset.csv"
         try:
             r = req.get(url, timeout=5)
@@ -387,7 +387,7 @@ if st.session_state.search_button and selected_riders:
         team_riders = [r for r in selected_riders if any(normalize_name(r) == normalize_name(s) for s in startlist)]
         st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
         if team_riders:
-            for rider in sorted(team_riders):
+            for rider in sorted(team_riders, key=lambda r: r.split()[-1]):
                 st.success(f"✅ **{rider}{get_rider_price(rider)}**")
         else:
             st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
