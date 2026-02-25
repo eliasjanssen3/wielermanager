@@ -42,7 +42,7 @@ def _img_to_base64(path: str) -> str:
         return base64.b64encode(f.read()).decode("utf-8")
 
 LOGO_PATH = "data/logo.png"
-logo_b64 = _img_to_base64(LOGO_PATH)
+logo_b64 = _img_to_base64(LOGO_PATH) if os.path.exists(LOGO_PATH) else ""
 
 @st.cache_data(ttl=300)  # refresh elke 5 minuten
 def load_csv():
@@ -179,35 +179,54 @@ def get_rider_price(rider_name):
 
 # ── Achtergrond ───────────────────────────────────────────────────────────────
 def set_background():
-    st.markdown("""
+    st.markdown(
+    f"""
     <style>
-    .stApp{
+    /* Background zoals je voorbeeld */
+    .stApp{{
         background: radial-gradient(circle at center,
             rgba(190, 235, 245, 1) 0%,
             rgba(140, 205, 225, 1) 35%,
             rgba(80, 165, 200, 1) 65%,
             rgba(45, 135, 185, 1) 100%);
         background-attachment: fixed;
-    }
+    }}
 
-    .wm-header{
-        display:flex;
-        align-items:center;
-        gap:18px;
-        margin-bottom:15px;
-    }
+    /* Logo links/rechts in de marges, blijft op dezelfde plek in je scherm */
+    .wm-floating-logo {{
+        position: fixed;
+        top: 120px;                  /* hoogte in scherm (pas aan) */
+        width: 150px;                /* logo grootte (pas aan) */
+        height: auto;
+        opacity: 0.95;
+        z-index: 9999;
+        filter: drop-shadow(0 10px 18px rgba(0,0,0,.28));
+        pointer-events: none;        /* zodat je overal kan klikken */
+    }}
 
-    .wm-logo{
-        width:90px;
-        filter: drop-shadow(0 8px 14px rgba(0,0,0,.25));
-    }
+    .wm-left {{
+        left: 28px;
+    }}
 
-    .wm-title{
-        font-size:42px;
-        font-weight:800;
-    }
+    .wm-right {{
+        right: 28px;
+        transform: scaleX(-1);       /* optioneel: spiegel rechts voor symmetrie */
+        opacity: 0.85;
+    }}
+
+    /* Verberg logo op kleine schermen zodat het niet stoort */
+    @media (max-width: 1100px) {{
+        .wm-floating-logo {{
+            display: none;
+        }}
+    }}
     </style>
-    """, unsafe_allow_html=True)
+
+    <img class="wm-floating-logo wm-left"  src="data:image/png;base64,{logo_b64}" />
+    <img class="wm-floating-logo wm-right" src="data:image/png;base64,{logo_b64}" />
+    """,
+    unsafe_allow_html=True
+)
 
 set_background()
 
