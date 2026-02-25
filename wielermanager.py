@@ -192,25 +192,32 @@ def set_background():
         background-attachment: fixed;
     }}
 
-    /* GROTER logo */
+    /* BASIS logo styling */
     .wm-floating-logo {{
         position: fixed;
-        top: 130px;
-        width: 220px;   /* ← was 150px */
+
+        /* PERFECT verticaal midden */
+        top: 50%;
+        transform: translateY(-50%);
+
+        width: 240px;
         height: auto;
+
         opacity: 0.95;
         z-index: 9999;
-        filter: drop-shadow(0 12px 20px rgba(0,0,0,.30));
+
+        filter: drop-shadow(0 15px 25px rgba(0,0,0,.30));
         pointer-events: none;
     }}
 
+    /* links → midden van linker lege zone */
     .wm-left {{
-        left: 40px;
+        left: calc((100vw - 1200px) / 4);
     }}
 
+    /* rechts → midden van rechter lege zone */
     .wm-right {{
-        right: 40px;
-        /* GEEN transform meer → niet gespiegeld */
+        right: calc((100vw - 1200px) / 4);
     }}
 
     @media (max-width: 1300px) {{
