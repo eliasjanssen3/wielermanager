@@ -170,15 +170,39 @@ def get_rider_price(rider_name):
     return ""
 
 # ── Achtergrond ───────────────────────────────────────────────────────────────
-st.markdown("""
-    <style>
-    .stApp {
-        background-image: /data/background.jpg;
-        background-position: center;
-        background-attachment: fixed;
-    }
-    </style>
-""", unsafe_allow_html=True)
+def set_background():
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background:
+                radial-gradient(circle at center,
+                    rgba(190, 235, 245, 1) 0%,
+                    rgba(140, 205, 225, 1) 35%,
+                    rgba(80, 165, 200, 1) 65%,
+                    rgba(45, 135, 185, 1) 100%);
+            
+            background-attachment: fixed;
+        }
+
+        /* Optioneel: blur effect voor zachtere look */
+        .stApp::before {
+            content: "";
+            position: fixed;
+            top: -50px;
+            left: -50px;
+            right: -50px;
+            bottom: -50px;
+            background: inherit;
+            filter: blur(40px);
+            z-index: -1;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+set_background()
 
 # ── Wedstrijden ───────────────────────────────────────────────────────────────
 races = [
