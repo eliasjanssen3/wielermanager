@@ -182,7 +182,7 @@ def set_background():
     st.markdown(
     f"""
     <style>
-    /* Background zoals je voorbeeld */
+
     .stApp{{
         background: radial-gradient(circle at center,
             rgba(190, 235, 245, 1) 0%,
@@ -192,38 +192,38 @@ def set_background():
         background-attachment: fixed;
     }}
 
-    /* Logo links/rechts in de marges, blijft op dezelfde plek in je scherm */
+    /* GROTER logo */
     .wm-floating-logo {{
         position: fixed;
-        top: 120px;                  /* hoogte in scherm (pas aan) */
-        width: 150px;                /* logo grootte (pas aan) */
+        top: 130px;
+        width: 220px;   /* ← was 150px */
         height: auto;
         opacity: 0.95;
         z-index: 9999;
-        filter: drop-shadow(0 10px 18px rgba(0,0,0,.28));
-        pointer-events: none;        /* zodat je overal kan klikken */
+        filter: drop-shadow(0 12px 20px rgba(0,0,0,.30));
+        pointer-events: none;
     }}
 
     .wm-left {{
-        left: 28px;
+        left: 40px;
     }}
 
     .wm-right {{
-        right: 28px;
-        transform: scaleX(-1);       /* optioneel: spiegel rechts voor symmetrie */
-        opacity: 0.85;
+        right: 40px;
+        /* GEEN transform meer → niet gespiegeld */
     }}
 
-    /* Verberg logo op kleine schermen zodat het niet stoort */
-    @media (max-width: 1100px) {{
+    @media (max-width: 1300px) {{
         .wm-floating-logo {{
             display: none;
         }}
     }}
+
     </style>
 
-    <img class="wm-floating-logo wm-left"  src="data:image/png;base64,{logo_b64}" />
+    <img class="wm-floating-logo wm-left" src="data:image/png;base64,{logo_b64}" />
     <img class="wm-floating-logo wm-right" src="data:image/png;base64,{logo_b64}" />
+
     """,
     unsafe_allow_html=True
 )
