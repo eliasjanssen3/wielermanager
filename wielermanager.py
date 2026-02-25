@@ -41,7 +41,7 @@ def load_csv():
     """Haalt altijd de nieuwste versie op door versienummers af te proberen."""
     base = "https://datawrapper.dwcdn.net/dgT0d"
     # Probeer versies van hoog naar laag
-    for version in range(20, 0, -1):
+    for version in range(30, 0, -1):
         url = f"{base}/{version}/dataset.csv"
         try:
             r = req.get(url, timeout=5)
