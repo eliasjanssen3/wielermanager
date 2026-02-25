@@ -9,6 +9,7 @@ import requests as req
 from rapidfuzz import process
 from datetime import datetime
 import pytz
+import base64
 
 # ── Prijzen en programma's laden uit Datawrapper CSV ─────────────────────────
 DATAWRAPPER_URL = "https://datawrapper.dwcdn.net/dgT0d/10/dataset.csv"
@@ -35,6 +36,13 @@ RACE_AFKORTINGEN = {
     "WA P":"La Fleche Wallone",
     "LBL": "Liège-Bastogne-Liège",
 }
+
+def _img_to_base64(path: str) -> str:
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
+
+LOGO_PATH = "data/logo.png"
+logo_b64 = _img_to_base64(LOGO_PATH)
 
 @st.cache_data(ttl=300)  # refresh elke 5 minuten
 def load_csv():
@@ -171,36 +179,35 @@ def get_rider_price(rider_name):
 
 # ── Achtergrond ───────────────────────────────────────────────────────────────
 def set_background():
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background:
-                radial-gradient(circle at center,
-                    rgba(190, 235, 245, 1) 0%,
-                    rgba(140, 205, 225, 1) 35%,
-                    rgba(80, 165, 200, 1) 65%,
-                    rgba(45, 135, 185, 1) 100%);
-            
-            background-attachment: fixed;
-        }
+    st.markdown("""
+    <style>
+    .stApp{
+        background: radial-gradient(circle at center,
+            rgba(190, 235, 245, 1) 0%,
+            rgba(140, 205, 225, 1) 35%,
+            rgba(80, 165, 200, 1) 65%,
+            rgba(45, 135, 185, 1) 100%);
+        background-attachment: fixed;
+    }
 
-        /* Optioneel: blur effect voor zachtere look */
-        .stApp::before {
-            content: "";
-            position: fixed;
-            top: -50px;
-            left: -50px;
-            right: -50px;
-            bottom: -50px;
-            background: inherit;
-            filter: blur(40px);
-            z-index: -1;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    .wm-header{
+        display:flex;
+        align-items:center;
+        gap:18px;
+        margin-bottom:15px;
+    }
+
+    .wm-logo{
+        width:90px;
+        filter: drop-shadow(0 8px 14px rgba(0,0,0,.25));
+    }
+
+    .wm-title{
+        font-size:42px;
+        font-weight:800;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 set_background()
 
