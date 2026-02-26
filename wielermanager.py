@@ -410,19 +410,58 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
 
     kandidaten_gefilterd = [k for k in kandidaten if is_likely_rider(k)]
 
+    normalized_riders = {rider: normalize_name(rider) for rider in all_riders}
+
+    def find_best_match_strict(input_name):
+        norm_input = normalize_name(input_name)
+        input_words = set(norm_input.split())
+
+        # 1. Exacte match
+        for original, norm in normalized_riders.items():
+            if norm == norm_input:
+                return original
+
+        # 2. Omgekeerde volgorde exacte match
+        words = norm_input.split()
+        reversed_input = ' '.join(reversed(words)) if len(words) >= 2 else None
+        if reversed_input:
+            for original, norm in normalized_riders.items():
+                if norm == reversed_input:
+                    return original
+
+        # 3. Fuzzy match met strengere drempel + minstens 1 woord exact overlappen
+        match1 = process.extractOne(norm_input, list(normalized_riders.values()))
+        match2 = process.extractOne(reversed_input, list(normalized_riders.values())) if reversed_input else None
+        if match1 and match2:
+            best = match1 if match1[1] >= match2[1] else match2
+        else:
+            best = match1 or match2
+
+        if best and best[1] >= 88:
+            match_words = set(best[0].split())
+            # Gemeenschappelijke woorden van minstens 3 letters
+            overlap = {w for w in (input_words & match_words) if len(w) >= 3}
+            if not overlap:
+                return None
+            # Als er maar 1 woord overlapt, moet de score hoger zijn (95+)
+            # Dit voorkomt bv "Elias Janssen" → "Elias Maris" (alleen "elias" overlapt)
+            if len(overlap) == 1 and best[1] < 95:
+                return None
+            for original, norm in normalized_riders.items():
+                if norm == best[0]:
+                    return original
+        return None
+
     matched = []
-    niet_gevonden = []
     al_gevonden = set()
 
     for kandidaat in kandidaten_gefilterd:
-        match = find_best_match(kandidaat, all_riders)
+        match = find_best_match_strict(kandidaat)
         if match and match not in al_gevonden:
             matched.append(match)
             al_gevonden.add(match)
-        elif not match:
-            niet_gevonden.append(kandidaat)
 
-    return matched, niet_gevonden
+    return matched, []
 
 if st.button("✅ Voeg toe"):
     if rider_input:
