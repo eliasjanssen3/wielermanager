@@ -364,30 +364,78 @@ if "selected_riders" not in st.session_state:
 
 
 st.subheader("📋 Snel jouw team invoeren")
+st.caption("💡 Tip: ga naar 'Mijn ploeg' → 'Mijn renners' op de wielermanager-site, selecteer alles en plak het hieronder. Ploegnamen, prijzen en andere tekst worden automatisch genegeerd.")
 rider_input = st.text_area(
-    "Plak of typ rennersnamen, gescheiden door komma's of nieuwe regels:",
-    placeholder="bv: Wout Van Aert, Van Der Poel, Pogacar..."
+    "Plak of typ rennersnamen (gescheiden door komma's of nieuwe regels):",
+    placeholder="bv: wout van aert, van der poel, pogacar...",
+    height=200,
 )
+
+def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
+    """
+    Haalt rennersnamen uit ruwe geplakte tekst.
+    Negeert ploegnamen, prijzen (€14M), lege regels en andere rommel.
+    """
+    kandidaten = re.split(r'[,\n]', text)
+    kandidaten = [k.strip() for k in kandidaten if k.strip()]
+
+    def is_likely_rider(s: str) -> bool:
+        if re.match(r'^€', s):
+            return False
+        if re.match(r'^\d+[\./,]?\d*$', s):
+            return False
+        if len(s) < 4 or len(s) > 40:
+            return False
+        team_woorden = [
+            "team", "cycling", "intermarché", "intermarche", "premier tech",
+            "emirates", "groupama", "deceuninck", "quickstep", "quick-step",
+            "soudal", "bahrain", "victorious", "ineos", "grenadiers", "visma",
+            "lease", "bike", "alpecin", "uno-x", "lidl", "trek", "cofidis",
+            "bora", "hansgrohe", "jayco", "alula", "movistar", "tudor",
+            "astana", "arkéa", "arkea", "lotto", "red bull", "dsm",
+            "firmenich", "picnic", "postnl", "pol", "rockets", "unibet",
+            "xds", "tarteletto", "bingoal", "flanders", "tomorrow", "q36",
+            "novo nordisk", "nsn", "xrg",
+            # UI-tekst van de wielermanager-site
+            "budget", "beheer", "ploeg", "opstelling", "renners", "resterend",
+            "geselecteerde", "minicompetitie", "transfers", "klassement",
+            "statistieken", "spelregels", "prijzen", "overzicht",
+        ]
+        s_lower = s.lower()
+        if any(tw in s_lower for tw in team_woorden):
+            return False
+        if ' – ' in s or ' - ' in s:
+            return False
+        return True
+
+    kandidaten_gefilterd = [k for k in kandidaten if is_likely_rider(k)]
+
+    matched = []
+    niet_gevonden = []
+    al_gevonden = set()
+
+    for kandidaat in kandidaten_gefilterd:
+        match = find_best_match(kandidaat, all_riders)
+        if match and match not in al_gevonden:
+            matched.append(match)
+            al_gevonden.add(match)
+        elif not match:
+            niet_gevonden.append(kandidaat)
+
+    return matched, niet_gevonden
 
 if st.button("✅ Voeg toe"):
     if rider_input:
-        input_riders = re.split(r'[,\n]', rider_input)
-        input_riders = [r.strip() for r in input_riders if r.strip()]
-        matched_riders = []
-        niet_gevonden = []
-        for rider in input_riders:
-            match = find_best_match(rider, st.session_state.all_riders)
-            if match:
-                matched_riders.append(match)
-            else:
-                niet_gevonden.append(rider)
+        matched_riders, niet_gevonden = extract_riders_from_paste(
+            rider_input, st.session_state.all_riders
+        )
         if matched_riders:
             st.session_state.selected_riders = matched_riders
-            st.success(f"✅ {len(matched_riders)} renners toegevoegd!")
+            st.success(f"✅ {len(matched_riders)} renners herkend en toegevoegd!")
         if niet_gevonden:
-            st.warning(f"⚠️ Niet gevonden: {', '.join(niet_gevonden)}")
+            st.warning(f"⚠️ Niet herkend (genegeerd): {', '.join(niet_gevonden)}")
         if len(matched_riders) != 20:
-            st.warning(f"⚠️ Let op! Je hebt {len(matched_riders)} renners geselecteerd (verwacht: 20).")
+            st.warning(f"⚠️ Let op! Je hebt {len(matched_riders)} renners (verwacht: 20).")
 
 st.subheader("📋 Selecteer je team")
 selected_riders = st.multiselect(
