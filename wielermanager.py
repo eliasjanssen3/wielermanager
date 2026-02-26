@@ -486,6 +486,8 @@ selected_riders = st.multiselect(
 
 if st.button("🔍 Zoeken"):
     st.session_state.search_button = True
+    if len(selected_riders) != 20:
+        st.warning(f"⚠️ Let op! Je hebt {len(selected_riders)} renners geselecteerd (verwacht: 20).")
 
 if st.session_state.search_button and selected_riders:
     with st.spinner("Bezig met ophalen van data..."):
