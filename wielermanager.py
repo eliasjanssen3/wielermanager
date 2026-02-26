@@ -414,7 +414,8 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
 
     def find_best_match_strict(input_name):
         norm_input = normalize_name(input_name)
-        input_words = set(norm_input.split())
+        input_words = norm_input.split()
+        input_first_letter = input_words[0][0] if input_words else ""
 
         # 1. Exacte match
         for original, norm in normalized_riders.items():
@@ -429,7 +430,7 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
                 if norm == reversed_input:
                     return original
 
-        # 3. Fuzzy match met strengere drempel + minstens 1 woord exact overlappen
+        # 3. Fuzzy match: drempel 85 + achternaam moet exact matchen + eerste letter voornaam klopt
         match1 = process.extractOne(norm_input, list(normalized_riders.values()))
         match2 = process.extractOne(reversed_input, list(normalized_riders.values())) if reversed_input else None
         if match1 and match2:
@@ -437,15 +438,16 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
         else:
             best = match1 or match2
 
-        if best and best[1] >= 88:
-            match_words = set(best[0].split())
-            # Gemeenschappelijke woorden van minstens 3 letters
-            overlap = {w for w in (input_words & match_words) if len(w) >= 3}
-            if not overlap:
+        if best and best[1] >= 85:
+            match_words = best[0].split()
+            # Achternaam = laatste woord — moet exact overeenkomen
+            input_lastname = input_words[-1] if input_words else ""
+            match_lastname = match_words[-1] if match_words else ""
+            if input_lastname != match_lastname:
                 return None
-            # Als er maar 1 woord overlapt, moet de score hoger zijn (95+)
-            # Dit voorkomt bv "Elias Janssen" → "Elias Maris" (alleen "elias" overlapt)
-            if len(overlap) == 1 and best[1] < 95:
+            # Eerste letter van voornaam moet kloppen (vangt "Tom" vs "Thomas")
+            match_first_letter = match_words[0][0] if match_words else ""
+            if input_first_letter and match_first_letter and input_first_letter != match_first_letter:
                 return None
             for original, norm in normalized_riders.items():
                 if norm == best[0]:
