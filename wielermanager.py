@@ -87,32 +87,100 @@ UNIBET_EVENT_IDS = {
 def fetch_unibet_odds(event_id: int) -> dict:
     """
     Haalt odds op via de Kambi API (Unibet's sportsbook provider).
-    Geeft dict terug: {renner_naam: decimal_odds}
+    Probeert meerdere URL-varianten. Geeft dict terug: {renner_naam: decimal_odds}
     """
+    urls_to_try = [
+        f"https://eu-offering-api.kambicdn.com/offering/v2018/unibet_belgium/betoffer/event/{event_id}.json?lang=nl_BE&market=BE",
+        f"https://eu-offering-api.kambicdn.com/offering/v2018/unibet_belgium/betoffer/event/{event_id}.json",
+        f"https://offering-api.kambicdn.com/offering/v2018/unibet_belgium/betoffer/event/{event_id}.json?lang=nl_BE&market=BE",
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Referer": f"https://nl.unibetsports.be/betting/sports/event/{event_id}",
+        "Origin": "https://nl.unibetsports.be",
+    }
+
+    data = None
+    for url in urls_to_try:
+        try:
+            r = req.get(url, timeout=8, headers=headers)
+            if r.status_code == 200:
+                data = r.json()
+                break
+        except Exception:
+            continue
+
+    if not data:
+        return {}
+
+    odds = {}
+    betoffers = data.get("betOffers", [])
+
+    for betoffer in betoffers:
+        criterion = betoffer.get("criterion", {})
+        label = criterion.get("label", "").lower()
+        criterion_id = criterion.get("id", 0)
+
+        # Accepteer alle mogelijke winnaar-markten
+        is_winner_market = (
+            "winner" in label
+            or "winnaar" in label
+            or "to win" in label
+            or criterion_id in (1001159179, 1001159185, 1001159200)  # bekende Kambi outright IDs
+        )
+
+        if not is_winner_market:
+            continue
+
+        for outcome in betoffer.get("outcomes", []):
+            name = outcome.get("label", "").strip()
+            odds_val = outcome.get("odds", 0)
+            # Kambi: odds 190 = 1.90, 1100 = 11.00
+            if odds_val and name and odds_val > 100:
+                odds[name] = odds_val / 100
+
+    # Fallback: als geen winnaar-markt gevonden, pak grootste betoffer
+    if not odds and betoffers:
+        biggest = max(betoffers, key=lambda b: len(b.get("outcomes", [])), default=None)
+        if biggest:
+            for outcome in biggest.get("outcomes", []):
+                name = outcome.get("label", "").strip()
+                odds_val = outcome.get("odds", 0)
+                if odds_val and name and odds_val > 100:
+                    odds[name] = odds_val / 100
+
+    return odds
+
+
+def debug_unibet_api(event_id: int):
+    """Toont ruwe API-response voor debugging in Streamlit."""
     url = (
         f"https://eu-offering-api.kambicdn.com/offering/v2018/unibet_belgium"
         f"/betoffer/event/{event_id}.json?lang=nl_BE&market=BE"
     )
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Referer": f"https://nl.unibetsports.be/betting/sports/event/{event_id}",
+    }
     try:
-        r = req.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code != 200:
-            return {}
-        data = r.json()
-        odds = {}
-        for betoffer in data.get("betOffers", []):
-            # Zoek de winnaar markt (criterionId 1001159179 = outright winner)
-            label = betoffer.get("criterion", {}).get("label", "").lower()
-            if "winner" not in label and "winnaar" not in label:
-                continue
-            for outcome in betoffer.get("outcomes", []):
-                name = outcome.get("label", "")
-                # Kambi geeft odds in formaat: 190 = 1.90, 1100 = 11.00
-                odds_val = outcome.get("odds", 0)
-                if odds_val and name:
-                    odds[name] = odds_val / 100
-        return odds
-    except Exception:
-        return {}
+        r = req.get(url, timeout=8, headers=headers)
+        st.write(f"**Status:** {r.status_code}")
+        if r.status_code == 200:
+            data = r.json()
+            betoffers = data.get("betOffers", [])
+            st.write(f"**Aantal betOffers:** {len(betoffers)}")
+            for i, bo in enumerate(betoffers[:5]):
+                st.write(f"BetOffer {i}: label=`{bo.get('criterion',{}).get('label')}`, "
+                         f"id=`{bo.get('criterion',{}).get('id')}`, "
+                         f"outcomes={len(bo.get('outcomes',[]))}")
+                if bo.get("outcomes"):
+                    first = bo["outcomes"][0]
+                    st.write(f"  → Eerste outcome: `{first.get('label')}` odds=`{first.get('odds')}`")
+        else:
+            st.write(f"Response: {r.text[:500]}")
+    except Exception as e:
+        st.error(f"Fout: {e}")
 
 # ── Monte Carlo EP berekening ─────────────────────────────────────────────────
 def bereken_expected_points(odds_dict: dict, category: str, rider_teams: dict,
@@ -611,7 +679,13 @@ if st.session_state.search_button and selected_riders:
     if not races_with_ep:
         st.info("ℹ️ Nog geen Unibet event IDs ingevuld. Voeg ze toe in UNIBET_EVENT_IDS bovenaan de code.")
     else:
-        # Toon waarschuwing voor koersen zonder odds
+        # Debug tool
+        with st.expander("🔧 Debug: API response bekijken"):
+            debug_race = st.selectbox("Koers voor debug:", [r for r, _ in races_with_ep], key="debug_race")
+            if st.button("🔍 Toon ruwe API response"):
+                debug_event_id = UNIBET_EVENT_IDS.get(debug_race)
+                if debug_event_id:
+                    debug_unibet_api(debug_event_id)
         if races_without_ep:
             st.caption(f"⚠️ Geen odds beschikbaar voor: {', '.join(races_without_ep)}")
 
