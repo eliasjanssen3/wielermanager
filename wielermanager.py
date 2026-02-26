@@ -367,7 +367,7 @@ st.subheader("📋 Snel jouw team invoeren")
 st.caption("💡 Tip: ga naar 'Mijn ploeg' → 'Mijn renners' op de wielermanager-site, selecteer alles en plak het hieronder. Ploegnamen, prijzen en andere tekst worden automatisch genegeerd.")
 rider_input = st.text_area(
     "Plak of typ rennersnamen (gescheiden door komma's of nieuwe regels):",
-    placeholder="bv: wout van aert, van der poel, pogacar...",
+    placeholder="bv: Wout Van Aert, Van Der Poel, Pogacar...",
     height=200,
 )
 
