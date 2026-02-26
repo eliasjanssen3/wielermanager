@@ -366,7 +366,7 @@ if "selected_riders" not in st.session_state:
 st.subheader("📋 Snel jouw team invoeren")
 rider_input = st.text_area(
     "Plak of typ rennersnamen, gescheiden door komma's of nieuwe regels:",
-    placeholder="bv: wout van aert, van der poel, pogacar..."
+    placeholder="bv: Wout Van Aert, Van Der Poel, Pogacar..."
 )
 
 if st.button("✅ Voeg toe"):
