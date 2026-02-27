@@ -232,25 +232,25 @@ set_background()
 
 # ── Wedstrijden ───────────────────────────────────────────────────────────────
 races = [
-    ("Omloop Het Nieuwsblad", "2026-02-28 11:30", "World Tour"),
-    ("Kuurne-Brussel-Kuurne", "2026-03-01 12:14", "Niet-World Tour"),
+    ("Omloop Het Nieuwsblad", "2026-02-28 11:15", "World Tour"),
+    ("Kuurne-Brussel-Kuurne", "2026-03-01 12:25", "Niet-World Tour"),
     ("GP-Samyn", "2026-03-03 12:35", "Niet-World Tour"),
-    ("Strade Bianche", "2026-03-07 11:25", "World Tour"),
+    ("Strade Bianche", "2026-03-07 11:45", "World Tour"),
     ("Nokere Koerse", "2026-03-18 12:55", "Niet-World Tour"),
-    ("Bredene Koksijde Classic", "2026-03-20 12:22", "Niet-World Tour"),
-    ("Milano-Sanremo", "2026-03-21 10:25", "Monument"),
-    ("Classic Brugge-De Panne", "2026-03-25 12:50", "World Tour"),
+    ("Bredene Koksijde Classic", "2026-03-20 12:21", "Niet-World Tour"),
+    ("Milano-Sanremo", "2026-03-21 10:00", "Monument"),
+    ("Classic Brugge-De Panne", "2026-03-25 11:40", "World Tour"),
     ("E3 Harelbeke", "2026-03-27 12:52", "World Tour"),
-    ("Gent-Wevelgem", "2026-03-29 10:50", "World Tour"),
-    ("Dwars door Vlaanderen", "2026-04-01 12:40", "World Tour"),
-    ("Ronde van Vlaanderen", "2026-04-05 10:17", "Monument"),
-    ("Scheldeprijs", "2026-04-08 13:09", "Niet-World Tour"),
-    ("Paris-Roubaix", "2026-04-12 14:00", "Monument"),
+    ("Gent-Wevelgem", "2026-03-29 10:00", "World Tour"),
+    ("Dwars door Vlaanderen", "2026-04-01 12:09", "World Tour"),
+    ("Ronde van Vlaanderen", "2026-04-05 10:00", "Monument"),
+    ("Scheldeprijs", "2026-04-08 13:08", "Niet-World Tour"),
+    ("Paris-Roubaix", "2026-04-12 10:00", "Monument"),
     ("Ronde van Limburg", "2026-04-15 13:15", "Niet-World Tour"),
-    ("Brabantse Pijl", "2026-04-17 13:12", "Niet-World Tour"),
-    ("Amstel Gold Race", "2026-04-19 10:43", "World Tour"),
-    ("La Fleche Wallone", "2026-04-22 14:00", "World Tour"),
-    ("Liège-Bastogne-Liège", "2026-04-26 14:00", "Monument")
+    ("Brabantse Pijl", "2026-04-17 13:32", "Niet-World Tour"),
+    ("Amstel Gold Race", "2026-04-19 10:00", "World Tour"),
+    ("La Fleche Wallone", "2026-04-22 10:00", "World Tour"),
+    ("Liège-Bastogne-Liège", "2026-04-26 10:00", "Monument")
 ]
 
 # ── CSV laden ─────────────────────────────────────────────────────────────────
