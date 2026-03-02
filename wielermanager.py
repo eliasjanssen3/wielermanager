@@ -83,7 +83,7 @@ def get_startlist_from_csv(race_name, df):
             return False
 
     riders = df[col.apply(heeft_deelgenomen)]["Renner"].tolist()
-    return [pcs_format(r) for r in riders]
+    return [pcs_format(r) for r in riders if isinstance(r, str) and r.strip()]
 
 def pcs_format(name):
     """Zet ACHTERNAAM Voornaam om naar Voornaam ACHTERNAAM."""
