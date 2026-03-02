@@ -63,12 +63,24 @@ def load_csv():
     return pd.DataFrame()
 
 def get_startlist_from_csv(race_name, df):
-    """Geeft lijst van renners die een X hebben voor de gegeven race."""
+    """Geeft lijst van renners die een X (toekomstig) of punten (al gereden) hebben voor de gegeven race."""
     afk = next((k for k, v in RACE_AFKORTINGEN.items() if v == race_name), None)
     if afk is None or afk not in df.columns:
         return []
-    # Renners met X in de kolom, namen omzetten naar Voornaam ACHTERNAAM
-    riders = df[df[afk] == "X"]["Renner"].tolist()
+
+    col = df[afk]
+
+    def heeft_deelgenomen(val):
+        if pd.isna(val) or val == "" or val == 0:
+            return False
+        if str(val).strip().upper() == "X":
+            return True
+        try:
+            return float(val) > 0  # Punten > 0 = heeft gereden
+        except (ValueError, TypeError):
+            return False
+
+    riders = df[col.apply(heeft_deelgenomen)]["Renner"].tolist()
     return [pcs_format(r) for r in riders]
 
 def pcs_format(name):
