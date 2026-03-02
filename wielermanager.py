@@ -302,7 +302,8 @@ def fetch_data(selected_riders):
     rider_participation = {rider: 0 for rider in selected_riders}
     rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
     weak_races = {}
-    now = datetime.now()
+    cet = pytz.timezone("Europe/Brussels")
+    now = datetime.now(pytz.utc).astimezone(cet).replace(tzinfo=None)
 
     for race_name, race_date, category in races:
         race_datetime = datetime.strptime(race_date, "%Y-%m-%d %H:%M")
@@ -321,7 +322,8 @@ def fetch_data(selected_riders):
                         break
             renners_count = len(team_riders)
             for rider in team_riders:
-                rider_participation[rider] += 1
+                if race_datetime > now:
+                    rider_participation[rider] += 1
                 rider_schedule[rider][race_name] = "✅"
             if race_datetime > now and renners_count <= 9:
                 weak_races[race_name] = startlist
