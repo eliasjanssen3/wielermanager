@@ -292,7 +292,7 @@ def add_prices_to_recommended_transfers(recommended_transfers):
 def add_prices_to_rider_participation(rider_participation):
     df = pd.DataFrame(
         sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal deelnames"]
+        columns=["Renner", "Aantal toekomstige deelnames"]
     )
     df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
     return df
@@ -553,7 +553,7 @@ if st.session_state.search_button and selected_riders:
         else:
             st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
 
-    st.subheader("📊 Deelnames per renner")
+    st.subheader("📊 Toekomstige deelnames per renner")
     st.dataframe(add_prices_to_rider_participation(rider_participation).set_index("Renner"))
 
     next_race, days, hours, minutes = countdown_to_next_race()
