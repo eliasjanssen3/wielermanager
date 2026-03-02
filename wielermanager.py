@@ -71,12 +71,13 @@ def get_startlist_from_csv(race_name, df):
     col = df[afk]
 
     def heeft_deelgenomen(val):
-        if pd.isna(val) or val == "" or val == 0:
+        if pd.isna(val) or val == "":
             return False
         if str(val).strip().upper() == "X":
             return True
         try:
-            return float(val) > 0  # Punten > 0 = heeft gereden
+            float(val)
+            return True  # Elk getal (ook 0) = heeft meegedaan
         except (ValueError, TypeError):
             return False
 
