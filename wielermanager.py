@@ -73,7 +73,8 @@ def get_startlist_from_csv(race_name, df):
     def heeft_deelgenomen(val):
         if pd.isna(val) or val == "":
             return False
-        if str(val).strip().upper() == "X":
+        val_str = str(val).strip().upper()
+        if val_str in ("X", "DNF"):
             return True
         try:
             float(val)
