@@ -298,23 +298,64 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple:
 
     kandidaten_gefilterd = [k for k in kandidaten if is_likely_rider(k)]
 
-    # Bouw lookup: alle varianten van elke bekende renner
-    rider_variants = {rider: set(all_name_variants(rider)) for rider in all_riders}
+    # Voorbereken: voor elke bekende renner de gesplitste voornaam/achternaam
+    # We beschouwen het LAATSTE woord als doorslaggevend achternaam-deel,
+    # maar voor namen met tussenvoegsel (van, de, der...) nemen we alles
+    # behalve het allereerste woord als "achternaam-blok".
+    TUSSENVOEGSELS = {"van", "de", "der", "den", "du", "le", "la", "di", "del", "von"}
+
+    def split_name(norm: str):
+        """Geeft (voornaam_eerste_letter, achternaam_blok) terug."""
+        words = norm.split()
+        if not words:
+            return "", ""
+        # Zoek het eerste woord dat GEEN tussenvoegsel is en niet het enige woord
+        for i, w in enumerate(words):
+            if w not in TUSSENVOEGSELS:
+                # Dit is de voornaam (of begin van voornaam)
+                voornaam_letter = w[0] if w else ""
+                achternaam = " ".join(words[i+1:]) if i + 1 < len(words) else ""
+                return voornaam_letter, achternaam
+        # Alles is tussenvoegsel (onwaarschijnlijk)
+        return words[0][0], " ".join(words[1:])
 
     def find_best_match_strict(input_name):
-        input_variants = set(all_name_variants(input_name))
-        # 1. Exacte match via varianten
-        for original, variants in rider_variants.items():
-            if input_variants & variants:
-                return original
-        # 2. Fuzzy match als fallback
         norm_input = normalize_name(input_name)
-        norm_riders = {rider: normalize_name(rider) for rider in all_riders}
-        match = process.extractOne(norm_input, list(norm_riders.values()))
-        if match and match[1] >= 85:
-            for original, norm in norm_riders.items():
-                if norm == match[0]:
-                    return original
+        words_input = norm_input.split()
+
+        # Probeer alle rotaties van de invoer (voor/achternaam kunnen omgewisseld zijn)
+        rotaties = []
+        for i in range(len(words_input)):
+            rotaties.append(words_input[i:] + words_input[:i])
+
+        for original in all_riders:
+            norm_original = normalize_name(original)
+            words_orig = norm_original.split()
+
+            for rot in rotaties:
+                # Probeer: rot[0] = voornaam, rot[1:] = achternaam
+                if len(rot) < 2:
+                    continue
+                voornaam_letter = rot[0][0] if rot[0] else ""
+                achternaam_input = " ".join(rot[1:])
+
+                # Achternaam van de bekende renner bepalen
+                _, achternaam_orig = split_name(norm_original)
+
+                if not achternaam_input or not achternaam_orig:
+                    continue
+
+                # Achternaam moet exact overeenkomen
+                if achternaam_input != achternaam_orig:
+                    continue
+
+                # Eerste letter voornaam moet kloppen
+                voornaam_letter_orig, _ = split_name(norm_original)
+                if voornaam_letter and voornaam_letter_orig and voornaam_letter != voornaam_letter_orig:
+                    continue
+
+                return original
+
         return None
 
     matched = []
