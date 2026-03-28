@@ -4,39 +4,13 @@ from bs4 import BeautifulSoup
 import unicodedata
 import re
 import os
-import io
 import requests as req
 from rapidfuzz import process
 from datetime import datetime
 import pytz
 import base64
 
-# ── Prijzen en programma's laden uit Datawrapper CSV ─────────────────────────
-DATAWRAPPER_URL = "https://datawrapper.dwcdn.net/dgT0d/10/dataset.csv"
-
-# Race afkortingen in CSV → volledige namen
-RACE_AFKORTINGEN = {
-    "OML": "Omloop Het Nieuwsblad",
-    "KBK": "Kuurne-Brussel-Kuurne",
-    "SAM": "GP-Samyn",
-    "STR": "Strade Bianche",
-    "NOK": "Nokere Koerse",
-    "BKC": "Bredene Koksijde Classic",
-    "MSR": "Milano-Sanremo",
-    "RVB": "Classic Brugge-De Panne",
-    "E3":  "E3 Harelbeke",
-    "IFF": "Gent-Wevelgem",
-    "DDV": "Dwars door Vlaanderen",
-    "RVV": "Ronde van Vlaanderen",
-    "SP":  "Scheldeprijs",
-    "PR":  "Paris-Roubaix",
-    "RVL": "Ronde van Limburg",
-    "BR P":"Brabantse Pijl",
-    "AGR": "Amstel Gold Race",
-    "WA P":"La Fleche Wallone",
-    "LBL": "Liège-Bastogne-Liège",
-}
-
+# ── Logo ──────────────────────────────────────────────────────────────────────
 def _img_to_base64(path: str) -> str:
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
@@ -44,45 +18,27 @@ def _img_to_base64(path: str) -> str:
 LOGO_PATH = "data/logo.png"
 logo_b64 = _img_to_base64(LOGO_PATH) if os.path.exists(LOGO_PATH) else ""
 
-@st.cache_data(ttl=300)  # refresh elke 5 minuten
-def load_csv():
-    """Haalt altijd de nieuwste versie op door versienummers af te proberen."""
-    base = "https://datawrapper.dwcdn.net/dgT0d"
-    # Probeer versies van hoog naar laag
-    for version in range(40, 0, -1):
-        url = f"{base}/{version}/dataset.csv"
-        try:
-            r = req.get(url, timeout=5)
-            if r.status_code == 200:
-                df = pd.read_csv(io.StringIO(r.text))
-                if not df.empty:
-                    return df
-        except Exception:
-            continue
-    st.warning("⚠️ Kon CSV niet ophalen.")
-    return pd.DataFrame()
-
 # ── PCS URL mapping per koers ─────────────────────────────────────────────────
 PCS_URLS = {
-    "Omloop Het Nieuwsblad":      "https://www.procyclingstats.com/race/omloop-het-nieuwsblad/2026/startlist",
-    "Kuurne-Brussel-Kuurne":      "https://www.procyclingstats.com/race/kuurne-brussel-kuurne/2026/startlist",
-    "GP-Samyn":                   "https://www.procyclingstats.com/race/gp-samyn/2026/startlist",
-    "Strade Bianche":             "https://www.procyclingstats.com/race/strade-bianche/2026/startlist",
-    "Nokere Koerse":              "https://www.procyclingstats.com/race/nokere-koerse/2026/startlist",
-    "Bredene Koksijde Classic":   "https://www.procyclingstats.com/race/bredene-koksijde-classic/2026/startlist",
-    "Milano-Sanremo":             "https://www.procyclingstats.com/race/milano-sanremo/2026/startlist",
-    "Classic Brugge-De Panne":    "https://www.procyclingstats.com/race/classic-brugge-de-panne/2026/startlist",
-    "E3 Harelbeke":               "https://www.procyclingstats.com/race/e3-saxo-bank-classic/2026/startlist",
-    "Gent-Wevelgem":              "https://www.procyclingstats.com/race/gent-wevelgem/2026/startlist",
-    "Dwars door Vlaanderen":      "https://www.procyclingstats.com/race/dwars-door-vlaanderen/2026/startlist",
-    "Ronde van Vlaanderen":       "https://www.procyclingstats.com/race/ronde-van-vlaanderen/2026/startlist",
-    "Scheldeprijs":               "https://www.procyclingstats.com/race/scheldeprijs/2026/startlist",
-    "Paris-Roubaix":              "https://www.procyclingstats.com/race/paris-roubaix/2026/startlist",
-    "Ronde van Limburg":          "https://www.procyclingstats.com/race/ronde-van-limburg/2026/startlist",
-    "Brabantse Pijl":             "https://www.procyclingstats.com/race/brabantse-pijl/2026/startlist",
-    "Amstel Gold Race":           "https://www.procyclingstats.com/race/amstel-gold-race/2026/startlist",
-    "La Fleche Wallone":          "https://www.procyclingstats.com/race/la-fleche-wallonne/2026/startlist",
-    "Liège-Bastogne-Liège":       "https://www.procyclingstats.com/race/liege-bastogne-liege/2026/startlist",
+    "Omloop Het Nieuwsblad":    "https://www.procyclingstats.com/race/omloop-het-nieuwsblad/2026/startlist",
+    "Kuurne-Brussel-Kuurne":    "https://www.procyclingstats.com/race/kuurne-brussel-kuurne/2026/startlist",
+    "GP-Samyn":                 "https://www.procyclingstats.com/race/gp-samyn/2026/startlist",
+    "Strade Bianche":           "https://www.procyclingstats.com/race/strade-bianche/2026/startlist",
+    "Nokere Koerse":            "https://www.procyclingstats.com/race/nokere-koerse/2026/startlist",
+    "Bredene Koksijde Classic": "https://www.procyclingstats.com/race/bredene-koksijde-classic/2026/startlist",
+    "Milano-Sanremo":           "https://www.procyclingstats.com/race/milano-sanremo/2026/startlist",
+    "Classic Brugge-De Panne": "https://www.procyclingstats.com/race/classic-brugge-de-panne/2026/startlist",
+    "E3 Harelbeke":             "https://www.procyclingstats.com/race/e3-saxo-bank-classic/2026/startlist",
+    "Gent-Wevelgem":            "https://www.procyclingstats.com/race/gent-wevelgem/2026/startlist",
+    "Dwars door Vlaanderen":    "https://www.procyclingstats.com/race/dwars-door-vlaanderen/2026/startlist",
+    "Ronde van Vlaanderen":     "https://www.procyclingstats.com/race/ronde-van-vlaanderen/2026/startlist",
+    "Scheldeprijs":             "https://www.procyclingstats.com/race/scheldeprijs/2026/startlist",
+    "Paris-Roubaix":            "https://www.procyclingstats.com/race/paris-roubaix/2026/startlist",
+    "Ronde van Limburg":        "https://www.procyclingstats.com/race/ronde-van-limburg/2026/startlist",
+    "Brabantse Pijl":           "https://www.procyclingstats.com/race/brabantse-pijl/2026/startlist",
+    "Amstel Gold Race":         "https://www.procyclingstats.com/race/amstel-gold-race/2026/startlist",
+    "La Fleche Wallone":        "https://www.procyclingstats.com/race/la-fleche-wallonne/2026/startlist",
+    "Liège-Bastogne-Liège":     "https://www.procyclingstats.com/race/liege-bastogne-liege/2026/startlist",
 }
 
 PCS_HEADERS = {
@@ -92,9 +48,74 @@ PCS_HEADERS = {
     "Referer": "https://www.procyclingstats.com/",
 }
 
-@st.cache_data(ttl=1800)  # cache 30 minuten
-def get_startlist_from_pcs(race_name):
-    """Scrapt de startlijst van ProCyclingStats. Geeft lege lijst bij falen."""
+# ── Naam hulpfuncties ─────────────────────────────────────────────────────────
+def pcs_format(name: str) -> str:
+    """
+    Zet PCS-formaat "VAN AERT Wout" / "VAN DER POEL Mathieu" om naar
+    "Wout Van Aert" / "Mathieu Van Der Poel".
+    Alles vóór het eerste woord dat niet volledig hoofdletters is = achternaam.
+    """
+    if not isinstance(name, str) or not name.strip():
+        return ""
+    parts = name.strip().split()
+    for i, part in enumerate(parts):
+        if not part.isupper():
+            voornaam = parts[i:]
+            achternaam = [p.capitalize() for p in parts[:i]]
+            return " ".join(voornaam + achternaam)
+    # Alles hoofdletters (geen voornaam?) → capitalize
+    return " ".join(p.capitalize() for p in parts)
+
+def normalize_name(name) -> str:
+    """Verwijder accenten, speciale tekens, lowercase."""
+    if name is None:
+        return ""
+    try:
+        if name != name:  # NaN check
+            return ""
+    except Exception:
+        pass
+    if not isinstance(name, str):
+        name = str(name)
+
+    replacements = {
+        "Æ": "AE", "æ": "ae", "Ø": "O", "ø": "o",
+        "Å": "A", "å": "a", "Č": "C", "č": "c",
+        "Š": "S", "š": "s", "Đ": "D", "đ": "d",
+        "Ž": "Z", "ž": "z", "Ć": "C", "ć": "c",
+    }
+    for special, replacement in replacements.items():
+        name = name.replace(special, replacement)
+
+    name = unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8")
+    name = re.sub(r"[^a-zA-Z\s-]", "", name)
+    return name.strip().lower()
+
+def all_name_variants(name: str) -> list:
+    """
+    Geeft alle cyclische rotaties van de naam terug als genormaliseerde strings.
+    "Wout Van Aert" → {"wout van aert", "van aert wout", "aert wout van"}
+    Zo matchen we ongeacht de volgorde die PCS of de gebruiker gebruikt.
+    """
+    norm = normalize_name(name)
+    words = norm.split()
+    if len(words) <= 1:
+        return [norm]
+    variants = set()
+    for i in range(len(words)):
+        variants.add(" ".join(words[i:] + words[:i]))
+    return list(variants)
+
+def names_match(name_a: str, name_b: str) -> bool:
+    """True als twee namen dezelfde persoon zijn (ongeacht volgorde van naamdelen)."""
+    variants_a = set(all_name_variants(name_a))
+    variants_b = set(all_name_variants(name_b))
+    return bool(variants_a & variants_b)
+
+# ── PCS scraping ──────────────────────────────────────────────────────────────
+@st.cache_data(ttl=1800)
+def get_startlist_from_pcs(race_name: str) -> list:
+    """Scrapt startlijst van PCS. Geeft namen terug in 'Voornaam Achternaam' formaat."""
     url = PCS_URLS.get(race_name)
     if not url:
         return []
@@ -103,153 +124,25 @@ def get_startlist_from_pcs(race_name):
         if r.status_code != 200:
             return []
         soup = BeautifulSoup(r.text, "html.parser")
-        riders = [a.text.strip() for a in soup.select("ul.startlist_v4 li a[href*='rider/']")]
-        return riders if riders else []
+        raw_names = [a.text.strip() for a in soup.select("ul.startlist_v4 li a[href*='rider/']")]
+        return [pcs_format(n) for n in raw_names if n.strip()]
     except Exception:
         return []
 
-def get_startlist_from_csv(race_name, df):
-    """Fallback: haalt startlijst uit CSV als PCS niet werkt."""
-    afk = next((k for k, v in RACE_AFKORTINGEN.items() if v == race_name), None)
-    if afk is None or afk not in df.columns:
-        return []
-
-    col = df[afk]
-
-    def heeft_deelgenomen(val):
-        if pd.isna(val) or val == "":
-            return False
-        val_str = str(val).strip().upper()
-        if val_str in ("X", "DNF"):
-            return True
-        try:
-            float(val)
-            return True
-        except (ValueError, TypeError):
-            return False
-
-    riders = df[col.apply(heeft_deelgenomen)]["Renner"].tolist()
-    return [pcs_format(r) for r in riders if isinstance(r, str) and r.strip()]
-
-def get_startlist(race_name, df):
-    """Haalt startlijst op: eerst PCS, dan CSV als fallback."""
-    riders = get_startlist_from_pcs(race_name)
-    if riders:
-        return riders
-    return get_startlist_from_csv(race_name, df)
-
-def pcs_format(name):
-    """Zet ACHTERNAAM Voornaam om naar Voornaam ACHTERNAAM."""
-    if not isinstance(name, str) or not name.strip():
-        return ""
-    parts = name.strip().split()
-    for i, part in enumerate(parts):
-        if not part.isupper():
-            return ' '.join(parts[i:] + parts[:i])
-    if len(parts) >= 2:
-        return ' '.join(parts[1:] + [parts[0].capitalize()])
-    return name
-
-# ── Naam normalisatie ─────────────────────────────────────────────────────────
-def normalize_name(name):
-    # ✅ Maak het safe voor NaN/None/niet-strings
-    if name is None:
-        return ""
-    # pandas NaN is float en is "not equal to itself"
-    try:
-        if name != name:  # NaN-check zonder pandas import
-            return ""
-    except Exception:
-        pass
-
-    if not isinstance(name, str):
-        name = str(name)
-
-    replacements = {
-        "Æ": "AE", "æ": "ae", "Ø": "O", "ø": "o",
-        "Å": "A", "å": "a", "Č": "C", "č": "c",
-        "Š": "S", "š": "s", "Đ": "D", "đ": "d",
-        "Ž": "Z", "ž": "z", "Ć": "C", "ć": "c"
-    }
-
-    for special, replacement in replacements.items():
-        name = name.replace(special, replacement)
-
-    name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8')
-    name = re.sub(r'[^a-zA-Z\s-]', '', name)
-    return name.strip().lower()
-
-def find_best_match(input_name, all_riders):
-    if not all_riders:
-        return None
-    normalized_input = normalize_name(input_name)
-    normalized_riders = {rider: normalize_name(rider) for rider in all_riders}
-
-    for original, norm in normalized_riders.items():
-        if norm == normalized_input:
-            return original
-
-    words = normalized_input.split()
-    reversed_input = ' '.join(reversed(words)) if len(words) >= 2 else None
-    if reversed_input:
-        for original, norm in normalized_riders.items():
-            if norm == reversed_input:
-                return original
-
-    match1 = process.extractOne(normalized_input, list(normalized_riders.values()))
-    match2 = process.extractOne(reversed_input, list(normalized_riders.values())) if reversed_input else None
-
-    if match1 and match2:
-        best = match1 if match1[1] >= match2[1] else match2
-    else:
-        best = match1 or match2
-
-    if best and best[1] > 75:
-        for original, norm in normalized_riders.items():
-            if norm == best[0]:
-                return original
-    return None
-
-def get_rider_price(rider_name):
-    if df_csv.empty:
-        return ""
-
-    normalized_input = normalize_name(rider_name)
-    df = df_csv.copy()
-    df["Normalized"] = df["Renner"].apply(normalize_name)
-
-    # 1. Exacte match
-    price_row = df[df["Normalized"] == normalized_input]
-
-    # 2. Alle splits van voornaam/achternaam proberen
-    # bv "arnaud de lie" → probeer "de lie arnaud", "lie arnaud de", etc.
-    if price_row.empty:
-        words = normalized_input.split()
-        for i in range(1, len(words)):
-            variant = ' '.join(words[i:] + words[:i])
-            price_row = df[df["Normalized"] == variant]
-            if not price_row.empty:
-                break
-
-    # 3. Fuzzy match als laatste redmiddel
-    if price_row.empty:
-        match_result = process.extractOne(normalized_input, df["Normalized"].tolist())
-        if match_result and match_result[1] > 80:
-            price_row = df[df["Normalized"] == match_result[0]]
-
-    if not price_row.empty and "€" in price_row.columns:
-        try:
-            return f" ({int(price_row.iloc[0]['€'])}M)"
-        except:
-            return ""
-    return ""
+@st.cache_data(ttl=1800)
+def get_all_pcs_riders() -> list:
+    """Haalt alle unieke renners op uit alle PCS startlijsten."""
+    all_riders = set()
+    for race_name in PCS_URLS:
+        riders = get_startlist_from_pcs(race_name)
+        all_riders.update(riders)
+    return sorted(all_riders)
 
 # ── Achtergrond ───────────────────────────────────────────────────────────────
 def set_background():
     st.markdown(
     f"""
     <style>
-
     .stApp{{
         background: radial-gradient(circle at center,
             rgba(190, 235, 245, 1) 0%,
@@ -258,39 +151,24 @@ def set_background():
             rgba(45, 135, 185, 1) 100%);
         background-attachment: fixed;
     }}
-
-    /* GROTER logo */
     .wm-floating-logo {{
         position: fixed;
         top: 130px;
-        width: 220px;   /* ← was 150px */
+        width: 220px;
         height: auto;
         opacity: 0.95;
         z-index: 9999;
         filter: drop-shadow(0 12px 20px rgba(0,0,0,.30));
         pointer-events: none;
     }}
-
-    .wm-left {{
-        left: 40px;
-    }}
-
-    .wm-right {{
-        right: 40px;
-        /* GEEN transform meer → niet gespiegeld */
-    }}
-
+    .wm-left {{ left: 40px; }}
+    .wm-right {{ right: 40px; }}
     @media (max-width: 1300px) {{
-        .wm-floating-logo {{
-            display: none;
-        }}
+        .wm-floating-logo {{ display: none; }}
     }}
-
     </style>
-
     <img class="wm-floating-logo wm-left" src="data:image/png;base64,{logo_b64}" />
     <img class="wm-floating-logo wm-right" src="data:image/png;base64,{logo_b64}" />
-
     """,
     unsafe_allow_html=True
 )
@@ -299,57 +177,33 @@ set_background()
 
 # ── Wedstrijden ───────────────────────────────────────────────────────────────
 races = [
-    ("Omloop Het Nieuwsblad", "2026-02-28 11:15", "World Tour"),
-    ("Kuurne-Brussel-Kuurne", "2026-03-01 12:25", "Niet-World Tour"),
-    ("GP-Samyn", "2026-03-03 12:35", "Niet-World Tour"),
-    ("Strade Bianche", "2026-03-07 11:45", "World Tour"),
-    ("Nokere Koerse", "2026-03-18 12:55", "Niet-World Tour"),
+    ("Omloop Het Nieuwsblad",    "2026-02-28 11:15", "World Tour"),
+    ("Kuurne-Brussel-Kuurne",    "2026-03-01 12:25", "Niet-World Tour"),
+    ("GP-Samyn",                 "2026-03-03 12:35", "Niet-World Tour"),
+    ("Strade Bianche",           "2026-03-07 11:45", "World Tour"),
+    ("Nokere Koerse",            "2026-03-18 12:55", "Niet-World Tour"),
     ("Bredene Koksijde Classic", "2026-03-20 12:21", "Niet-World Tour"),
-    ("Milano-Sanremo", "2026-03-21 10:00", "Monument"),
+    ("Milano-Sanremo",           "2026-03-21 10:00", "Monument"),
     ("Classic Brugge-De Panne", "2026-03-25 11:40", "World Tour"),
-    ("E3 Harelbeke", "2026-03-27 12:52", "World Tour"),
-    ("Gent-Wevelgem", "2026-03-29 10:00", "World Tour"),
-    ("Dwars door Vlaanderen", "2026-04-01 12:09", "World Tour"),
-    ("Ronde van Vlaanderen", "2026-04-05 10:00", "Monument"),
-    ("Scheldeprijs", "2026-04-08 13:08", "Niet-World Tour"),
-    ("Paris-Roubaix", "2026-04-12 10:00", "Monument"),
-    ("Ronde van Limburg", "2026-04-15 13:15", "Niet-World Tour"),
-    ("Brabantse Pijl", "2026-04-17 13:32", "Niet-World Tour"),
-    ("Amstel Gold Race", "2026-04-19 10:00", "World Tour"),
-    ("La Fleche Wallone", "2026-04-22 10:00", "World Tour"),
-    ("Liège-Bastogne-Liège", "2026-04-26 10:00", "Monument")
+    ("E3 Harelbeke",             "2026-03-27 12:52", "World Tour"),
+    ("Gent-Wevelgem",            "2026-03-29 10:00", "World Tour"),
+    ("Dwars door Vlaanderen",    "2026-04-01 12:09", "World Tour"),
+    ("Ronde van Vlaanderen",     "2026-04-05 10:00", "Monument"),
+    ("Scheldeprijs",             "2026-04-08 13:08", "Niet-World Tour"),
+    ("Paris-Roubaix",            "2026-04-12 10:00", "Monument"),
+    ("Ronde van Limburg",        "2026-04-15 13:15", "Niet-World Tour"),
+    ("Brabantse Pijl",           "2026-04-17 13:32", "Niet-World Tour"),
+    ("Amstel Gold Race",         "2026-04-19 10:00", "World Tour"),
+    ("La Fleche Wallone",        "2026-04-22 10:00", "World Tour"),
+    ("Liège-Bastogne-Liège",     "2026-04-26 10:00", "Monument"),
 ]
 
-# ── CSV laden ─────────────────────────────────────────────────────────────────
-df_csv = load_csv()
-
-# ── Renners laden bij opstarten uit CSV ───────────────────────────────────────
+# ── Renners laden bij opstarten vanuit PCS ────────────────────────────────────
 if "all_riders" not in st.session_state:
-    if not df_csv.empty:
-        st.session_state.all_riders = sorted([x for x in [pcs_format(r) for r in df_csv["Renner"].dropna().tolist()] if x and not x[0].isdigit()])
-    else:
-        st.session_state.all_riders = []
+    with st.spinner("Renners laden vanuit ProCyclingStats..."):
+        st.session_state.all_riders = get_all_pcs_riders()
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def add_prices_to_schedule(schedule):
-    return {rider + get_rider_price(rider): rs for rider, rs in schedule.items()}
-
-def add_prices_to_recommended_transfers(recommended_transfers):
-    df = pd.DataFrame(
-        sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
-    )
-    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
-    return df
-
-def add_prices_to_rider_participation(rider_participation):
-    df = pd.DataFrame(
-        sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
-        columns=["Renner", "Aantal toekomstige deelnames"]
-    )
-    df["Renner"] = df["Renner"].apply(lambda r: r + get_rider_price(r))
-    return df
-
 def fetch_data(selected_riders):
     results = []
     rider_participation = {rider: 0 for rider in selected_riders}
@@ -360,26 +214,13 @@ def fetch_data(selected_riders):
 
     for race_name, race_date, category in races:
         race_datetime = datetime.strptime(race_date, "%Y-%m-%d %H:%M")
-        startlist = get_startlist(race_name, df_csv)
+        startlist = get_startlist_from_pcs(race_name)
+
         if not startlist:
             renners_count = "⚠️ Geen data"
             team_riders = []
         else:
-            # Normaliseer startlijst + ook omgekeerde volgorde (PCS geeft soms ACHTERNAAM Voornaam)
-            startlist_norms = []
-            for s in startlist:
-                norm = normalize_name(s)
-                words = norm.split()
-                rev = " ".join(reversed(words)) if len(words) >= 2 else norm
-                startlist_norms.append((norm, rev))
-
-            team_riders = []
-            for selected in selected_riders:
-                norm_selected = normalize_name(selected)
-                for norm, rev in startlist_norms:
-                    if norm_selected in (norm, rev):
-                        team_riders.append(selected)
-                        break
+            team_riders = [s for s in selected_riders if any(names_match(s, starter) for starter in startlist)]
             renners_count = len(team_riders)
             for rider in team_riders:
                 if race_datetime > now:
@@ -393,7 +234,7 @@ def fetch_data(selected_riders):
     recommended_transfers = {}
     for race, race_riders in weak_races.items():
         for rider in race_riders:
-            if rider not in selected_riders:
+            if not any(names_match(rider, s) for s in selected_riders):
                 recommended_transfers[rider] = recommended_transfers.get(rider, 0) + 1
 
     return results, rider_participation, rider_schedule, recommended_transfers
@@ -401,19 +242,10 @@ def fetch_data(selected_riders):
 def fetch_rider_schedule(selected_riders):
     rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
     for race_name, _, _ in races:
-        startlist = get_startlist(race_name, df_csv)
-        startlist_norms = []
-        for s in startlist:
-            norm = normalize_name(s)
-            words = norm.split()
-            rev = " ".join(reversed(words)) if len(words) >= 2 else norm
-            startlist_norms.append((norm, rev))
+        startlist = get_startlist_from_pcs(race_name)
         for rider in selected_riders:
-            norm = normalize_name(rider)
-            for s_norm, s_rev in startlist_norms:
-                if norm in (s_norm, s_rev):
-                    rider_schedule[rider][race_name] = "✅"
-                    break
+            if any(names_match(rider, starter) for starter in startlist):
+                rider_schedule[rider][race_name] = "✅"
     return rider_schedule
 
 def get_next_race():
@@ -436,38 +268,15 @@ def countdown_to_next_race():
             return race_name, days, hours, minutes
     return None, None, None, None
 
-# ── Streamlit UI ──────────────────────────────────────────────────────────────
-st.title("🚴 Wielermanager Tools")
-
-if "search_button" not in st.session_state:
-    st.session_state.search_button = False
-if "selected_riders" not in st.session_state:
-    st.session_state.selected_riders = []
-
-
-st.subheader("📋 Snel jouw team invoeren")
-st.caption("💡 Tip: ga naar 'Mijn ploeg' → 'Mijn renners' op de wielermanager-site, selecteer alles en plak het hieronder. Ploegnamen, prijzen en andere tekst worden automatisch genegeerd.")
-rider_input = st.text_area(
-    "Plak of typ rennersnamen (gescheiden door komma's of nieuwe regels):",
-    placeholder="bv: Wout Van Aert, Van Der Poel, Pogacar...",
-    height=200,
-)
-
-def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
-    """
-    Haalt rennersnamen uit ruwe geplakte tekst.
-    Negeert ploegnamen, prijzen (€14M), lege regels en andere rommel.
-    """
-    kandidaten = re.split(r'[,\n]', text)
+def extract_riders_from_paste(text: str, all_riders: list) -> tuple:
+    """Haalt rennersnamen uit ruwe geplakte tekst van de wielermanager-site."""
+    kandidaten = re.split(r"[,\n]", text)
     kandidaten = [k.strip() for k in kandidaten if k.strip()]
 
     def is_likely_rider(s: str) -> bool:
-        if re.match(r'^€', s):
-            return False
-        if re.match(r'^\d+[\./,]?\d*$', s):
-            return False
-        if len(s) < 4 or len(s) > 40:
-            return False
+        if re.match(r"^€", s): return False
+        if re.match(r"^\d+[\./,]?\d*$", s): return False
+        if len(s) < 4 or len(s) > 40: return False
         team_woorden = [
             "team", "cycling", "intermarché", "intermarche", "premier tech",
             "emirates", "groupama", "deceuninck", "quickstep", "quick-step",
@@ -478,67 +287,38 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
             "firmenich", "picnic", "postnl", "pol", "rockets", "unibet",
             "xds", "tarteletto", "bingoal", "flanders", "tomorrow", "q36",
             "novo nordisk", "nsn", "xrg",
-            # UI-tekst van de wielermanager-site
             "budget", "beheer", "ploeg", "opstelling", "renners", "resterend",
             "geselecteerde", "minicompetitie", "transfers", "klassement",
             "statistieken", "spelregels", "prijzen", "overzicht",
         ]
         s_lower = s.lower()
-        if any(tw in s_lower for tw in team_woorden):
-            return False
-        if ' – ' in s or ' - ' in s:
-            return False
+        if any(tw in s_lower for tw in team_woorden): return False
+        if " – " in s or " - " in s: return False
         return True
 
     kandidaten_gefilterd = [k for k in kandidaten if is_likely_rider(k)]
 
-    normalized_riders = {rider: normalize_name(rider) for rider in all_riders}
+    # Bouw lookup: alle varianten van elke bekende renner
+    rider_variants = {rider: set(all_name_variants(rider)) for rider in all_riders}
 
     def find_best_match_strict(input_name):
-        norm_input = normalize_name(input_name)
-        input_words = norm_input.split()
-        input_first_letter = input_words[0][0] if input_words else ""
-
-        # 1. Exacte match
-        for original, norm in normalized_riders.items():
-            if norm == norm_input:
+        input_variants = set(all_name_variants(input_name))
+        # 1. Exacte match via varianten
+        for original, variants in rider_variants.items():
+            if input_variants & variants:
                 return original
-
-        # 2. Omgekeerde volgorde exacte match
-        words = norm_input.split()
-        reversed_input = ' '.join(reversed(words)) if len(words) >= 2 else None
-        if reversed_input:
-            for original, norm in normalized_riders.items():
-                if norm == reversed_input:
-                    return original
-
-        # 3. Fuzzy match: drempel 85 + achternaam moet exact matchen + eerste letter voornaam klopt
-        match1 = process.extractOne(norm_input, list(normalized_riders.values()))
-        match2 = process.extractOne(reversed_input, list(normalized_riders.values())) if reversed_input else None
-        if match1 and match2:
-            best = match1 if match1[1] >= match2[1] else match2
-        else:
-            best = match1 or match2
-
-        if best and best[1] >= 85:
-            match_words = best[0].split()
-            # Achternaam = laatste woord — moet exact overeenkomen
-            input_lastname = input_words[-1] if input_words else ""
-            match_lastname = match_words[-1] if match_words else ""
-            if input_lastname != match_lastname:
-                return None
-            # Eerste letter van voornaam moet kloppen (vangt "Tom" vs "Thomas")
-            match_first_letter = match_words[0][0] if match_words else ""
-            if input_first_letter and match_first_letter and input_first_letter != match_first_letter:
-                return None
-            for original, norm in normalized_riders.items():
-                if norm == best[0]:
+        # 2. Fuzzy match als fallback
+        norm_input = normalize_name(input_name)
+        norm_riders = {rider: normalize_name(rider) for rider in all_riders}
+        match = process.extractOne(norm_input, list(norm_riders.values()))
+        if match and match[1] >= 85:
+            for original, norm in norm_riders.items():
+                if norm == match[0]:
                     return original
         return None
 
     matched = []
     al_gevonden = set()
-
     for kandidaat in kandidaten_gefilterd:
         match = find_best_match_strict(kandidaat)
         if match and match not in al_gevonden:
@@ -546,6 +326,22 @@ def extract_riders_from_paste(text: str, all_riders: list) -> tuple[list, list]:
             al_gevonden.add(match)
 
     return matched, []
+
+# ── Streamlit UI ──────────────────────────────────────────────────────────────
+st.title("🚴 Wielermanager Tools")
+
+if "search_button" not in st.session_state:
+    st.session_state.search_button = False
+if "selected_riders" not in st.session_state:
+    st.session_state.selected_riders = []
+
+st.subheader("📋 Snel jouw team invoeren")
+st.caption("💡 Tip: ga naar 'Mijn ploeg' → 'Mijn renners' op de wielermanager-site, selecteer alles en plak het hieronder. Ploegnamen, prijzen en andere tekst worden automatisch genegeerd.")
+rider_input = st.text_area(
+    "Plak of typ rennersnamen (gescheiden door komma's of nieuwe regels):",
+    placeholder="bv: Wout Van Aert, Van Der Poel, Pogacar...",
+    height=200,
+)
 
 if st.button("✅ Voeg toe"):
     if rider_input:
@@ -580,15 +376,7 @@ if st.session_state.search_button and selected_riders:
     st.dataframe(df.drop(columns=["Datum"]))
 
     st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
-    schedule_with_prices = add_prices_to_schedule(rider_schedule)
-    schedule_df = pd.DataFrame.from_dict(schedule_with_prices, orient="index")
-    # Sorteer op prijs (hoog naar laag), prijs staat tussen haakjes bv " (14M)"
-    def extract_price(name):
-        import re
-        m = re.search(r"\((\d+)M\)", name)
-        return int(m.group(1)) if m else 0
-    schedule_df = schedule_df.iloc[sorted(range(len(schedule_df)), key=lambda i: extract_price(schedule_df.index[i]), reverse=True)]
-    st.dataframe(schedule_df)
+    st.dataframe(pd.DataFrame.from_dict(rider_schedule, orient="index"))
 
     st.subheader("🔍 Vergelijk mogelijke transfers")
     available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
@@ -597,10 +385,14 @@ if st.session_state.search_button and selected_riders:
         with st.spinner("Bezig met ophalen van schema's..."):
             transfer_schedule = fetch_rider_schedule(transfer_riders)
         st.subheader("📅 Wedstrijdschema van mogelijke transfers")
-        st.dataframe(pd.DataFrame.from_dict(add_prices_to_schedule(transfer_schedule), orient="index").sort_index())
+        st.dataframe(pd.DataFrame.from_dict(transfer_schedule, orient="index").sort_index())
 
     st.subheader("🔄 Voorgestelde transfers voor zwak bezette toekomstige wedstrijden")
-    st.dataframe(add_prices_to_recommended_transfers(recommended_transfers).set_index("Renner"))
+    rec_df = pd.DataFrame(
+        sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
+        columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
+    ).set_index("Renner")
+    st.dataframe(rec_df)
 
     st.subheader("🏁 Jouw startlijst per wedstrijd")
     next_race = get_next_race()
@@ -610,26 +402,21 @@ if st.session_state.search_button and selected_riders:
         index=[race[0] for race in races].index(next_race)
     )
     if wedstrijd_optie:
-        startlist = get_startlist(wedstrijd_optie, df_csv)
-        def matches_startlist(rider, startlist):
-            norm = normalize_name(rider)
-            for s in startlist:
-                s_norm = normalize_name(s)
-                words = s_norm.split()
-                s_rev = " ".join(reversed(words)) if len(words) >= 2 else s_norm
-                if norm in (s_norm, s_rev):
-                    return True
-            return False
-        team_riders = [r for r in selected_riders if matches_startlist(r, startlist)]
+        startlist = get_startlist_from_pcs(wedstrijd_optie)
+        team_riders = [r for r in selected_riders if any(names_match(r, s) for s in startlist)]
         st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
         if team_riders:
-            for rider in sorted(team_riders, key=lambda r: " ".join(w for w in r.split() if w.isupper()) or r.split()[-1].lower()):
-                st.success(f"✅ **{rider}{get_rider_price(rider)}**")
+            for rider in sorted(team_riders, key=lambda r: normalize_name(r).split()[-1]):
+                st.success(f"✅ **{rider}**")
         else:
             st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
 
     st.subheader("📊 Toekomstige deelnames per renner")
-    st.dataframe(add_prices_to_rider_participation(rider_participation).set_index("Renner"))
+    part_df = pd.DataFrame(
+        sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
+        columns=["Renner", "Aantal toekomstige deelnames"]
+    ).set_index("Renner")
+    st.dataframe(part_df)
 
     next_race, days, hours, minutes = countdown_to_next_race()
     if next_race:
