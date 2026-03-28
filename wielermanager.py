@@ -28,7 +28,7 @@ PCS_URLS = {
     "Bredene Koksijde Classic": "https://www.procyclingstats.com/race/bredene-koksijde-classic/2026/startlist",
     "Milano-Sanremo":           "https://www.procyclingstats.com/race/milano-sanremo/2026/startlist",
     "Classic Brugge-De Panne": "https://www.procyclingstats.com/race/classic-brugge-de-panne/2026/startlist",
-    "E3 Harelbeke":             "https://www.procyclingstats.com/race/e3-saxo-bank-classic/2026/startlist",
+    "E3 Harelbeke":             "https://www.procyclingstats.com/race/e3-harelbeke/2026/startlist",
     "Gent-Wevelgem":            "https://www.procyclingstats.com/race/gent-wevelgem/2026/startlist",
     "Dwars door Vlaanderen":    "https://www.procyclingstats.com/race/dwars-door-vlaanderen/2026/startlist",
     "Ronde van Vlaanderen":     "https://www.procyclingstats.com/race/ronde-van-vlaanderen/2026/startlist",
