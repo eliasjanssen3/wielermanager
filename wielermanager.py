@@ -365,12 +365,19 @@ def fetch_data(selected_riders):
             renners_count = "⚠️ Geen data"
             team_riders = []
         else:
-            # Match geselecteerde renners met startlijst via fuzzy matching
+            # Normaliseer startlijst + ook omgekeerde volgorde (PCS geeft soms ACHTERNAAM Voornaam)
+            startlist_norms = []
+            for s in startlist:
+                norm = normalize_name(s)
+                words = norm.split()
+                rev = " ".join(reversed(words)) if len(words) >= 2 else norm
+                startlist_norms.append((norm, rev))
+
             team_riders = []
             for selected in selected_riders:
                 norm_selected = normalize_name(selected)
-                for starter in startlist:
-                    if normalize_name(starter) == norm_selected:
+                for norm, rev in startlist_norms:
+                    if norm_selected in (norm, rev):
                         team_riders.append(selected)
                         break
             renners_count = len(team_riders)
@@ -395,10 +402,16 @@ def fetch_rider_schedule(selected_riders):
     rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
     for race_name, _, _ in races:
         startlist = get_startlist(race_name, df_csv)
+        startlist_norms = []
+        for s in startlist:
+            norm = normalize_name(s)
+            words = norm.split()
+            rev = " ".join(reversed(words)) if len(words) >= 2 else norm
+            startlist_norms.append((norm, rev))
         for rider in selected_riders:
             norm = normalize_name(rider)
-            for starter in startlist:
-                if normalize_name(starter) == norm:
+            for s_norm, s_rev in startlist_norms:
+                if norm in (s_norm, s_rev):
                     rider_schedule[rider][race_name] = "✅"
                     break
     return rider_schedule
@@ -598,7 +611,16 @@ if st.session_state.search_button and selected_riders:
     )
     if wedstrijd_optie:
         startlist = get_startlist(wedstrijd_optie, df_csv)
-        team_riders = [r for r in selected_riders if any(normalize_name(r) == normalize_name(s) for s in startlist)]
+        def matches_startlist(rider, startlist):
+            norm = normalize_name(rider)
+            for s in startlist:
+                s_norm = normalize_name(s)
+                words = s_norm.split()
+                s_rev = " ".join(reversed(words)) if len(words) >= 2 else s_norm
+                if norm in (s_norm, s_rev):
+                    return True
+            return False
+        team_riders = [r for r in selected_riders if matches_startlist(r, startlist)]
         st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
         if team_riders:
             for rider in sorted(team_riders, key=lambda r: " ".join(w for w in r.split() if w.isupper()) or r.split()[-1].lower()):
