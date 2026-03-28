@@ -62,8 +62,54 @@ def load_csv():
     st.warning("⚠️ Kon CSV niet ophalen.")
     return pd.DataFrame()
 
+# ── PCS URL mapping per koers ─────────────────────────────────────────────────
+PCS_URLS = {
+    "Omloop Het Nieuwsblad":      "https://www.procyclingstats.com/race/omloop-het-nieuwsblad/2026/startlist",
+    "Kuurne-Brussel-Kuurne":      "https://www.procyclingstats.com/race/kuurne-brussel-kuurne/2026/startlist",
+    "GP-Samyn":                   "https://www.procyclingstats.com/race/gp-samyn/2026/startlist",
+    "Strade Bianche":             "https://www.procyclingstats.com/race/strade-bianche/2026/startlist",
+    "Nokere Koerse":              "https://www.procyclingstats.com/race/nokere-koerse/2026/startlist",
+    "Bredene Koksijde Classic":   "https://www.procyclingstats.com/race/bredene-koksijde-classic/2026/startlist",
+    "Milano-Sanremo":             "https://www.procyclingstats.com/race/milano-sanremo/2026/startlist",
+    "Classic Brugge-De Panne":    "https://www.procyclingstats.com/race/classic-brugge-de-panne/2026/startlist",
+    "E3 Harelbeke":               "https://www.procyclingstats.com/race/e3-saxo-bank-classic/2026/startlist",
+    "Gent-Wevelgem":              "https://www.procyclingstats.com/race/gent-wevelgem/2026/startlist",
+    "Dwars door Vlaanderen":      "https://www.procyclingstats.com/race/dwars-door-vlaanderen/2026/startlist",
+    "Ronde van Vlaanderen":       "https://www.procyclingstats.com/race/ronde-van-vlaanderen/2026/startlist",
+    "Scheldeprijs":               "https://www.procyclingstats.com/race/scheldeprijs/2026/startlist",
+    "Paris-Roubaix":              "https://www.procyclingstats.com/race/paris-roubaix/2026/startlist",
+    "Ronde van Limburg":          "https://www.procyclingstats.com/race/ronde-van-limburg/2026/startlist",
+    "Brabantse Pijl":             "https://www.procyclingstats.com/race/brabantse-pijl/2026/startlist",
+    "Amstel Gold Race":           "https://www.procyclingstats.com/race/amstel-gold-race/2026/startlist",
+    "La Fleche Wallone":          "https://www.procyclingstats.com/race/la-fleche-wallonne/2026/startlist",
+    "Liège-Bastogne-Liège":       "https://www.procyclingstats.com/race/liege-bastogne-liege/2026/startlist",
+}
+
+PCS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "nl-BE,nl;q=0.9,en;q=0.8",
+    "Referer": "https://www.procyclingstats.com/",
+}
+
+@st.cache_data(ttl=1800)  # cache 30 minuten
+def get_startlist_from_pcs(race_name):
+    """Scrapt de startlijst van ProCyclingStats. Geeft lege lijst bij falen."""
+    url = PCS_URLS.get(race_name)
+    if not url:
+        return []
+    try:
+        r = req.get(url, headers=PCS_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        riders = [a.text.strip() for a in soup.select("ul.startlist_v4 li a[href*='rider/']")]
+        return riders if riders else []
+    except Exception:
+        return []
+
 def get_startlist_from_csv(race_name, df):
-    """Geeft lijst van renners die een X (toekomstig) of punten (al gereden) hebben voor de gegeven race."""
+    """Fallback: haalt startlijst uit CSV als PCS niet werkt."""
     afk = next((k for k, v in RACE_AFKORTINGEN.items() if v == race_name), None)
     if afk is None or afk not in df.columns:
         return []
@@ -78,12 +124,19 @@ def get_startlist_from_csv(race_name, df):
             return True
         try:
             float(val)
-            return True  # Elk getal (ook 0) = heeft meegedaan
+            return True
         except (ValueError, TypeError):
             return False
 
     riders = df[col.apply(heeft_deelgenomen)]["Renner"].tolist()
     return [pcs_format(r) for r in riders if isinstance(r, str) and r.strip()]
+
+def get_startlist(race_name, df):
+    """Haalt startlijst op: eerst PCS, dan CSV als fallback."""
+    riders = get_startlist_from_pcs(race_name)
+    if riders:
+        return riders
+    return get_startlist_from_csv(race_name, df)
 
 def pcs_format(name):
     """Zet ACHTERNAAM Voornaam om naar Voornaam ACHTERNAAM."""
@@ -307,7 +360,7 @@ def fetch_data(selected_riders):
 
     for race_name, race_date, category in races:
         race_datetime = datetime.strptime(race_date, "%Y-%m-%d %H:%M")
-        startlist = get_startlist_from_csv(race_name, df_csv)
+        startlist = get_startlist(race_name, df_csv)
         if not startlist:
             renners_count = "⚠️ Geen data"
             team_riders = []
@@ -341,7 +394,7 @@ def fetch_data(selected_riders):
 def fetch_rider_schedule(selected_riders):
     rider_schedule = {rider: {race[0]: "❌" for race in races} for rider in selected_riders}
     for race_name, _, _ in races:
-        startlist = get_startlist_from_csv(race_name, df_csv)
+        startlist = get_startlist(race_name, df_csv)
         for rider in selected_riders:
             norm = normalize_name(rider)
             for starter in startlist:
@@ -544,7 +597,7 @@ if st.session_state.search_button and selected_riders:
         index=[race[0] for race in races].index(next_race)
     )
     if wedstrijd_optie:
-        startlist = get_startlist_from_csv(wedstrijd_optie, df_csv)
+        startlist = get_startlist(wedstrijd_optie, df_csv)
         team_riders = [r for r in selected_riders if any(normalize_name(r) == normalize_name(s) for s in startlist)]
         st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
         if team_riders:
