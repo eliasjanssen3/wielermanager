@@ -186,7 +186,7 @@ races = [
     ("Milano-Sanremo",           "2026-03-21 10:00", "Monument"),
     ("Classic Brugge-De Panne", "2026-03-25 11:40", "World Tour"),
     ("E3 Harelbeke",             "2026-03-27 12:52", "World Tour"),
-    ("Gent-Wevelgem",            "2026-03-29 10:00", "World Tour"),
+    ("Gent-Wevelgem",            "2026-03-29 11:07", "World Tour"),
     ("Dwars door Vlaanderen",    "2026-04-01 12:09", "World Tour"),
     ("Ronde van Vlaanderen",     "2026-04-05 10:00", "Monument"),
     ("Scheldeprijs",             "2026-04-08 13:08", "Niet-World Tour"),
