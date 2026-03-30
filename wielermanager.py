@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import unicodedata
 import re
 import os
+import io
 import requests as req
 from rapidfuzz import process
 from datetime import datetime
@@ -17,6 +18,50 @@ def _img_to_base64(path: str) -> str:
 
 LOGO_PATH = "data/logo.png"
 logo_b64 = _img_to_base64(LOGO_PATH) if os.path.exists(LOGO_PATH) else ""
+
+# ── Prijzen laden uit Datawrapper CSV ────────────────────────────────────────
+@st.cache_data(ttl=300)
+def load_prijzen_csv():
+    base = "https://datawrapper.dwcdn.net/dgT0d"
+    for version in range(40, 0, -1):
+        url = f"{base}/{version}/dataset.csv"
+        try:
+            r = req.get(url, timeout=5)
+            if r.status_code == 200:
+                df = pd.read_csv(io.StringIO(r.text))
+                if not df.empty:
+                    return df
+        except Exception:
+            continue
+    return pd.DataFrame()
+
+def get_rider_price(rider_name: str) -> str:
+    if df_prijzen.empty or "€" not in df_prijzen.columns:
+        return ""
+    normalized_input = normalize_name(rider_name)
+    df = df_prijzen.copy()
+    df["Normalized"] = df["Renner"].apply(normalize_name)
+    # Exacte match
+    row = df[df["Normalized"] == normalized_input]
+    # Rotatie-match (voor/achternaam omgewisseld)
+    if row.empty:
+        words = normalized_input.split()
+        for i in range(1, len(words)):
+            variant = " ".join(words[i:] + words[:i])
+            row = df[df["Normalized"] == variant]
+            if not row.empty:
+                break
+    # Fuzzy fallback
+    if row.empty:
+        match = process.extractOne(normalized_input, df["Normalized"].tolist())
+        if match and match[1] > 80:
+            row = df[df["Normalized"] == match[0]]
+    if not row.empty:
+        try:
+            return f" ({int(row.iloc[0]['€'])}M)"
+        except Exception:
+            return ""
+    return ""
 
 # ── PCS URL mapping per koers ─────────────────────────────────────────────────
 PCS_URLS = {
@@ -115,19 +160,33 @@ def names_match(name_a: str, name_b: str) -> bool:
 # ── PCS scraping ──────────────────────────────────────────────────────────────
 @st.cache_data(ttl=1800)
 def get_startlist_from_pcs(race_name: str) -> list:
-    """Scrapt startlijst van PCS. Geeft namen terug in 'Voornaam Achternaam' formaat."""
-    url = PCS_URLS.get(race_name)
-    if not url:
+    """Scrapt startlijst van PCS. Probeert startlist én results pagina."""
+    base_url = PCS_URLS.get(race_name)
+    if not base_url:
         return []
-    try:
-        r = req.get(url, headers=PCS_HEADERS, timeout=10)
-        if r.status_code != 200:
-            return []
-        soup = BeautifulSoup(r.text, "html.parser")
-        raw_names = [a.text.strip() for a in soup.select("ul.startlist_v4 li a[href*='rider/']")]
-        return [pcs_format(n) for n in raw_names if n.strip()]
-    except Exception:
-        return []
+
+    # Probeer startlist-pagina én results-pagina (voor al gereden koersen)
+    urls_to_try = [
+        base_url,
+        base_url.replace("/startlist", ""),
+        base_url.replace("/startlist", "/result"),
+    ]
+
+    for url in urls_to_try:
+        try:
+            r = req.get(url, headers=PCS_HEADERS, timeout=10)
+            if r.status_code != 200:
+                continue
+            soup = BeautifulSoup(r.text, "html.parser")
+            # Probeer meerdere selectors
+            raw_names = [a.text.strip() for a in soup.select("ul.startlist_v4 li a[href*='rider/']")]
+            if not raw_names:
+                raw_names = [a.text.strip() for a in soup.select("a[href*='/rider/']") if a.text.strip() and a.text.strip()[0].isupper()]
+            if raw_names:
+                return [pcs_format(n) for n in raw_names if n.strip()]
+        except Exception:
+            continue
+    return []
 
 @st.cache_data(ttl=1800)
 def get_all_pcs_riders() -> list:
@@ -186,7 +245,7 @@ races = [
     ("Milano-Sanremo",           "2026-03-21 10:00", "Monument"),
     ("Classic Brugge-De Panne", "2026-03-25 11:40", "World Tour"),
     ("E3 Harelbeke",             "2026-03-27 12:52", "World Tour"),
-    ("Gent-Wevelgem",            "2026-03-29 11:07", "World Tour"),
+    ("Gent-Wevelgem",            "2026-03-29 10:00", "World Tour"),
     ("Dwars door Vlaanderen",    "2026-04-01 12:09", "World Tour"),
     ("Ronde van Vlaanderen",     "2026-04-05 10:00", "Monument"),
     ("Scheldeprijs",             "2026-04-08 13:08", "Niet-World Tour"),
@@ -197,6 +256,9 @@ races = [
     ("La Fleche Wallone",        "2026-04-22 10:00", "World Tour"),
     ("Liège-Bastogne-Liège",     "2026-04-26 10:00", "Monument"),
 ]
+
+# ── Prijzen laden ─────────────────────────────────────────────────────────────
+df_prijzen = load_prijzen_csv()
 
 # ── Renners laden bij opstarten vanuit PCS ────────────────────────────────────
 if "all_riders" not in st.session_state:
@@ -417,7 +479,9 @@ if st.session_state.search_button and selected_riders:
     st.dataframe(df.drop(columns=["Datum"]))
 
     st.subheader("📅 Overzicht: Welke renners starten in welke wedstrijd?")
-    st.dataframe(pd.DataFrame.from_dict(rider_schedule, orient="index"))
+    schedule_met_prijzen = {r + get_rider_price(r): v for r, v in rider_schedule.items()}
+    schedule_df = pd.DataFrame.from_dict(schedule_met_prijzen, orient="index")
+    st.dataframe(schedule_df)
 
     st.subheader("🔍 Vergelijk mogelijke transfers")
     available_transfers = [r for r in st.session_state.all_riders if r not in selected_riders]
@@ -432,8 +496,9 @@ if st.session_state.search_button and selected_riders:
     rec_df = pd.DataFrame(
         sorted(recommended_transfers.items(), key=lambda x: x[1], reverse=True),
         columns=["Renner", "Aantal wedstrijden met laag aantal deelnemers"]
-    ).set_index("Renner")
-    st.dataframe(rec_df)
+    )
+    rec_df["Renner"] = rec_df["Renner"].apply(lambda r: r + get_rider_price(r))
+    st.dataframe(rec_df.set_index("Renner"))
 
     st.subheader("🏁 Jouw startlijst per wedstrijd")
     next_race = get_next_race()
@@ -448,7 +513,7 @@ if st.session_state.search_button and selected_riders:
         st.subheader(f"🏁 Jouw renners in {wedstrijd_optie}:")
         if team_riders:
             for rider in sorted(team_riders, key=lambda r: normalize_name(r).split()[-1]):
-                st.success(f"✅ **{rider}**")
+                st.success(f"✅ **{rider}{get_rider_price(rider)}**")
         else:
             st.warning("🚨 Geen renners van jouw team in deze wedstrijd!")
 
@@ -456,8 +521,9 @@ if st.session_state.search_button and selected_riders:
     part_df = pd.DataFrame(
         sorted(rider_participation.items(), key=lambda x: x[1], reverse=True),
         columns=["Renner", "Aantal toekomstige deelnames"]
-    ).set_index("Renner")
-    st.dataframe(part_df)
+    )
+    part_df["Renner"] = part_df["Renner"].apply(lambda r: r + get_rider_price(r))
+    st.dataframe(part_df.set_index("Renner"))
 
     next_race, days, hours, minutes = countdown_to_next_race()
     if next_race:
