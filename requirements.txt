@@ -4,3 +4,4 @@ beautifulsoup4
 streamlit
 rapidfuzz
 requests
+pytz
