@@ -250,7 +250,7 @@ races = [
     ("Ronde van Vlaanderen",     "2026-04-05 10:00", "Monument"),
     ("Scheldeprijs",             "2026-04-08 13:08", "Niet-World Tour"),
     ("Paris-Roubaix",            "2026-04-12 10:00", "Monument"),
-    ("Ronde van Limburg",        "2026-04-15 10:00", "Niet-World Tour"),
+    ("Ronde van Limburg",        "2026-04-15 13:00", "Niet-World Tour"),
     ("Brabantse Pijl",           "2026-04-17 13:32", "Niet-World Tour"),
     ("Amstel Gold Race",         "2026-04-19 11:13", "World Tour"),
     ("La Fleche Wallone",        "2026-04-22 11:50", "World Tour"),
